@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # Expose port
-EXPOSE 3002
+EXPOSE ${REDIS_PORT}
 
 # Default command (can be overridden by docker-compose)
 CMD ["npm", "run", "dev"]

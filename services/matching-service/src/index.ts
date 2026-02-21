@@ -3,8 +3,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import { connectRedis } from './config/redis';
 import { logger } from './utils/logger';
+import { connectRedis } from './config/redis';
 
 // load environment variables
 dotenv.config();
@@ -38,18 +38,10 @@ io.on('disconnect', (socket) => {
     logger.info(`User disconnected: ${socket.id}`);
 });
 
-const PORT = process.env.PORT;
+const PORT = process.env.MATCHING_SERVICE_PORT || 3002;
 
-async function startServer() {
-    try {
-        await connectRedis();
-        server.listen(PORT, () => {
-            logger.info(`Matching service listening on port ${PORT}`);
-        });
-    } catch (error) {
-        logger.error('Failed to start server:', error);
-        process.exit(1);
-    }
-}
-
-startServer();
+connectRedis().then(() => {
+    server.listen(PORT, () => {
+        logger.info(`Matching service listening on port ${PORT}`);
+    });
+});

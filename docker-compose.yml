@@ -1,42 +1,24 @@
-version: '3.8'
-
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: peerprep-redis
-    ports:
-      - '6379:6379'
-    volumes:
-      - redis-data:/data
-    
-    # enable data persistence
-    command: redis-server --appendonly yes
-    networks:
-      - peerprep-network
-
   matching-service:
     build: ./services/matching-service
     container_name: peerprep-matching-service
     ports:
-      - '3002:3002'
+      - '${MATCHING_SERVICE_PORT:-3002}:${MATCHING_SERVICE_PORT:-3002}'
     environment:
-      - REDIS_URL=redis://redis:6379
-      - PORT=3002
+      - REDIS_USERNAME=${REDIS_USERNAME}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - MATCHING_SERVICE_PORT=${MATCHING_SERVICE_PORT:-3002}
       - NODE_ENV=development
       - MATCHING_TIMEOUT=3000
       - LOG_LEVEL=debug
-    depends_on:
-      - redis
     volumes:
       - ./services/matching-service:/app
       - /app/node_modules
     networks:
       - peerprep-network
     command: npm run dev
-
-volumes:
-  redis-data:
-    driver: local
 
 networks:
   peerprep-network:
