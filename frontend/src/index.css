@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --color-background: hsl(222 47% 6%);
+  --color-foreground: hsl(210 40% 98%);
+
+  --color-card: hsl(222 47% 8%);
+  --color-card-foreground: hsl(210 40% 98%);
+
+  --color-popover: hsl(222 47% 8%);
+  --color-popover-foreground: hsl(210 40% 98%);
+
+  --color-primary: hsl(187 94% 43%);
+  --color-primary-foreground: hsl(222 47% 6%);
+
+  --color-secondary: hsl(222 30% 14%);
+  --color-secondary-foreground: hsl(210 40% 98%);
+
+  --color-muted: hsl(222 30% 14%);
+  --color-muted-foreground: hsl(215 20% 55%);
+
+  --color-accent: hsl(265 89% 66%);
+  --color-accent-foreground: hsl(210 40% 98%);
+
+  --color-success: hsl(142 71% 45%);
+  --color-success-foreground: hsl(222 47% 6%);
+
+  --color-warning: hsl(38 92% 50%);
+  --color-warning-foreground: hsl(222 47% 6%);
+
+  --color-destructive: hsl(0 84% 60%);
+  --color-destructive-foreground: hsl(210 40% 98%);
+
+  --color-border: hsl(222 30% 18%);
+  --color-input: hsl(222 30% 18%);
+  --color-ring: hsl(187 94% 43%);
+
+  --radius: 0.75rem;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-sidebar-background: hsl(222 47% 6%);
+  --color-sidebar-foreground: hsl(210 40% 98%);
+  --color-sidebar-primary: hsl(187 94% 43%);
+  --color-sidebar-primary-foreground: hsl(222 47% 6%);
+  --color-sidebar-accent: hsl(222 30% 14%);
+  --color-sidebar-accent-foreground: hsl(210 40% 98%);
+  --color-sidebar-border: hsl(222 30% 18%);
+  --color-sidebar-ring: hsl(187 94% 43%);
+}
+
+/* Keep :root for any non-Tailwind CSS var usage (gradients, shadows, etc.) */
+:root {
+  --gradient-primary: linear-gradient(135deg, hsl(187 94% 43%), hsl(199 89% 48%));
+  --gradient-accent: linear-gradient(135deg, hsl(265 89% 66%), hsl(280 87% 65%));
+  --gradient-glow: radial-gradient(ellipse at center, hsl(187 94% 43% / 0.15), transparent 70%);
+  --shadow-glow: 0 0 60px -15px hsl(187 94% 43% / 0.4);
+  --shadow-card: 0 4px 24px -4px hsl(222 47% 2% / 0.5);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+
+  code,
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .gradient-glow {
+    background: var(--gradient-glow);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .animate-spin-slow {
+    animation: spin 3s linear infinite;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
