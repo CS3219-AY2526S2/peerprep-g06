@@ -3,6 +3,7 @@ import Login from '../src/pages/Login';
 import Signup from '../src/pages/Signup';
 import Index from '../src/pages/Index';
 import Match from './pages/Match';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 const App = () => {
   return (
@@ -11,7 +12,16 @@ const App = () => {
       <Route path="/" element={<Index />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
-      <Route path="/match" element={<Match />} />
+
+      {/* Protected routes */}
+      <Route
+        path="/match"
+        element={
+          <ProtectedRoute>
+            <Match />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Fallback */}
       <Route path="*" element={<div>404 Not Found</div>} />

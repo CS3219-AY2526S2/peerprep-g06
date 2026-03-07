@@ -5,6 +5,7 @@ import { useAppStore, Difficulty } from '@/store/useAppStore';
 import { difficulties, topics, languages } from '@/lib/mockData';
 import { Code2, LogOut, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const MatchingSetup = () => {
   const navigate = useNavigate();
@@ -19,11 +20,13 @@ export const MatchingSetup = () => {
     setLanguage,
     setCurrentState,
   } = useAppStore();
+  const { signOut } = useAuth();
   const [localDifficulty, setLocalDifficulty] = useState<Difficulty | null>(selectedDifficulty);
   const [localTopic, setLocalTopic] = useState<string | null>(selectedTopic);
   const [localLanguage, setLocalLanguage] = useState<string | null>(selectedLanguage);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut(); // ← sign out from Supabase
     logout();
     navigate('/');
   };
