@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAppStore, Difficulty } from '@/store/useAppStore';
-import { difficulties, topics, languages } from '@/lib/mockData';
+import { topics, languages } from '@/lib/mockData';
 import { Code2, LogOut, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { DIFFICULTIES } from '../../../shared/constants';
 
 export const MatchingSetup = () => {
   const navigate = useNavigate();
@@ -84,7 +85,7 @@ export const MatchingSetup = () => {
         <div className="mb-10 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <h2 className="text-xl font-semibold mb-4">Choose difficulty</h2>
           <div className="grid grid-cols-3 gap-4">
-            {difficulties.map((diff) => (
+            {DIFFICULTIES.map((diff) => (
               <button
                 key={diff.id}
                 onClick={() => setLocalDifficulty(diff.id as Difficulty)}

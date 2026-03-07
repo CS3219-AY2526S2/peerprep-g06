@@ -1,9 +1,3 @@
-export const difficulties = [
-  { id: 'easy', label: 'Easy', color: 'text-success', description: 'Warm-up problems' },
-  { id: 'medium', label: 'Medium', color: 'text-warning', description: 'Standard interview level' },
-  { id: 'hard', label: 'Hard', color: 'text-destructive', description: 'Advanced challenges' },
-] as const;
-
 export const languages = [
   { id: 'javascript', label: 'JavaScript', icon: '🟨' },
   { id: 'python', label: 'Python', icon: '🐍' },
