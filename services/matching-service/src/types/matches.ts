@@ -4,7 +4,7 @@ export interface MatchRequest {
     difficulty: 'EASY' | 'MEDIUM' | 'HARD';
     languages: string[];
     joinedAt: Date;
-    status: 'PENDING' | 'MATCHED' | 'CANCELLED' | 'TIMED_OUT';
+    status: MatchStatus;
 }
 
 export interface MatchResponse {
@@ -15,4 +15,8 @@ export interface MatchResponse {
     difficulty: 'EASY' | 'MEDIUM' | 'HARD';
     commonLanguage: string;
     createdAt: Date;
+}
+
+export interface MatchStatus {
+    status: 'PENDING' | 'MATCHED' | 'CANCELLED' | 'TIMED_OUT';
 }
