@@ -8,6 +8,7 @@ interface User {
   email: string;
   name: string;
   role: 'user' | 'admin' | 'developer';
+  isRequestingAdmin: boolean;
 }
 
 interface AppStore {

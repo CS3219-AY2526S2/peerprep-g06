@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
-import { Code2, ArrowLeft, User, Mail, Shield } from 'lucide-react';
+import { Code2, ArrowLeft, User, Mail, Shield, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { USER_ENDPOINTS } from '@/lib/api';
 
 const roleColors = {
   developer: 'text-primary',
@@ -12,6 +14,37 @@ const roleColors = {
 const Account = () => {
   const navigate = useNavigate();
   const { user } = useAppStore();
+  const [hasRequested, setHasRequested] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Check if user already requested
+  useEffect(() => {
+    setHasRequested(user?.isRequestingAdmin ?? false);
+  }, [user]);
+
+  const handleRequestAdmin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(USER_ENDPOINTS.requestAdmin, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user?.id }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error);
+      }
+
+      setHasRequested(true);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -97,9 +130,21 @@ const Account = () => {
             <p className="text-sm text-muted-foreground mb-4">
               Need elevated permissions? Submit a request to the development team.
             </p>
-            <Button variant="outline" size="sm">
-              Request Admin
-            </Button>
+
+            {hasRequested ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                Request submitted — we'll review it shortly.
+              </div>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={handleRequestAdmin} disabled={loading}>
+                  {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Request Admin
+                </Button>
+                {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+              </>
+            )}
           </div>
         )}
       </main>
