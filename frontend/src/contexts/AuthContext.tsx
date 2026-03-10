@@ -79,25 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (error) throw error;
-
-    if (data.user) {
-      const response = await fetch(`${import.meta.env.VITE_USER_SERVICE_URL}/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: data.user.id,
-          email: data.user.email,
-          display_name: name,
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to create user profile');
-      }
-
-      await syncToStore(data.user);
-    }
+    if (data.user) await syncToStore(data.user); // ← keep this
   };
 
   const signIn = async (email: string, password: string) => {
