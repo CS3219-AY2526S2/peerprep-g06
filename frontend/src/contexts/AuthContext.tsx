@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (supabaseUser) {
       const { data } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_requesting_admin')
         .eq('id', supabaseUser.id)
         .single();
 
@@ -43,6 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name:
           supabaseUser.user_metadata?.display_name || supabaseUser.email?.split('@')[0] || 'User',
         role: data?.role ?? 'user',
+        isRequestingAdmin: data?.is_requesting_admin ?? false, // ← add this
       });
     } else {
       storeLogout();
@@ -79,7 +80,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (error) throw error;
-    if (data.user) await syncToStore(data.user); // ← keep this
+
+    if (data.user) {
+      // Upsert profile in case trigger hasn't fired yet
+      await supabase.from('profiles').upsert([
+        {
+          id: data.user.id,
+          email: data.user.email,
+          display_name: name,
+        },
+      ]);
+
+      await syncToStore(data.user);
+    }
   };
 
   const signIn = async (email: string, password: string) => {
