@@ -7,6 +7,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  role: 'user' | 'admin' | 'developer';
 }
 
 interface AppStore {
@@ -71,24 +72,3 @@ export const useAppStore = create<AppStore>((set) => ({
       currentState: 'matching',
     }),
 }));
-
-// Sync Supabase auth → store (drop this in your AuthContext or a top-level component)
-export const useSyncAuthStore = () => {
-  const { setUser, logout } = useAppStore();
-
-  // Call this after successful signUp/signIn in AuthContext
-  const syncUser = (supabaseUser: any) => {
-    if (supabaseUser) {
-      setUser({
-        id: supabaseUser.id,
-        email: supabaseUser.email || '',
-        name:
-          supabaseUser.user_metadata?.display_name || supabaseUser.email?.split('@')[0] || 'User',
-      });
-    } else {
-      logout();
-    }
-  };
-
-  return { syncUser };
-};

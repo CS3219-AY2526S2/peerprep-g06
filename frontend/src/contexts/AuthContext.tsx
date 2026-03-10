@@ -29,13 +29,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { setUser: setStoreUser, logout: storeLogout } = useAppStore();
 
   // Helper to sync any Supabase user → app store
-  const syncToStore = (supabaseUser: User | null) => {
+  const syncToStore = async (supabaseUser: User | null) => {
     if (supabaseUser) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', supabaseUser.id)
+        .single();
+
       setStoreUser({
         id: supabaseUser.id,
         email: supabaseUser.email || '',
         name:
           supabaseUser.user_metadata?.display_name || supabaseUser.email?.split('@')[0] || 'User',
+        role: data?.role ?? 'user',
       });
     } else {
       storeLogout();
@@ -48,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         data: { session },
       } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
-      syncToStore(session?.user ?? null); // ← sync on initial load
+      await syncToStore(session?.user ?? null);
       setLoading(false);
     };
 
@@ -58,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      syncToStore(session?.user ?? null); // ← sync on every auth change
+      syncToStore(session?.user ?? null);
     });
 
     return () => subscription?.unsubscribe();
@@ -89,20 +96,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(err.error || 'Failed to create user profile');
       }
 
-      syncToStore(data.user); // ← sync immediately after signup
+      await syncToStore(data.user);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    syncToStore(data.user); // ← sync immediately after signin
+    await syncToStore(data.user);
   };
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    // storeLogout() is handled by onAuthStateChange above
   };
 
   const value: AuthContextType = {
