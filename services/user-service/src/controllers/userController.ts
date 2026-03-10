@@ -6,7 +6,7 @@ export class UserController {
     res.json({ status: 'User service is running' });
   }
 
-  static async createUser(req: Request, res: Response) {
+  static async signUp(req: Request, res: Response) {
     try {
       const { id, email, display_name } = req.body;
 
