@@ -59,7 +59,10 @@ export const MatchingSetup = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
+            <span
+              className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+              onClick={() => navigate('/account')}
+            >
               Welcome, <span className="text-foreground font-medium">{user?.name}</span>
             </span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
