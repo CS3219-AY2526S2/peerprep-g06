@@ -143,7 +143,7 @@ const Index = () => {
               <span className="font-bold text-gradient">PeerPrep</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 PeerPrep. Built for developers, by developers.
+              © 2026 PeerPrep. Built for developers, by developers.
             </p>
           </div>
         </div>

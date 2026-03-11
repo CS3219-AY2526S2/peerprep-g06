@@ -1,32 +1,75 @@
 import { create } from 'zustand';
-import { useAuth } from '@/contexts/AuthContext';
 
-interface AppStoreState {
-  userName: string;
-  userEmail: string;
-  setUserInfo: (email: string, name: string) => void;
-  clearUserInfo: () => void;
+export type AppState = 'landing' | 'login' | 'signup' | 'matching' | 'queue' | 'session';
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'user' | 'admin' | 'developer';
+  isRequestingAdmin: boolean;
 }
 
-// This is a simple store to manage app-level state
-export const useAppStore = create<AppStoreState>((set) => ({
-  userName: '',
-  userEmail: '',
+interface AppStore {
+  currentState: AppState;
+  user: User | null;
+  selectedDifficulty: Difficulty | null;
+  selectedTopic: string | null;
+  selectedLanguage: string | null;
+  matchedPeer: User | null;
+  sessionCode: string;
 
-  setUserInfo: (email: string, name: string) => set({ userEmail: email, userName: name }),
+  setCurrentState: (state: AppState) => void;
+  setUser: (user: User | null) => void; // ← replaces fake login(), driven by AuthContext
+  logout: () => void;
+  setDifficulty: (difficulty: Difficulty) => void;
+  setTopic: (topic: string) => void;
+  setLanguage: (language: string) => void;
+  setMatchedPeer: (peer: User | null) => void;
+  setSessionCode: (code: string) => void;
+  resetMatching: () => void;
+}
 
-  clearUserInfo: () => set({ userName: '', userEmail: '' }),
+export const useAppStore = create<AppStore>((set) => ({
+  currentState: 'landing',
+  user: null,
+  selectedDifficulty: null,
+  selectedTopic: null,
+  selectedLanguage: null,
+  matchedPeer: null,
+  sessionCode: `function solution(input) {\n  // Write your solution here\n  \n  return result;\n}`,
+
+  setCurrentState: (state) => set({ currentState: state }),
+
+  // Set real user from Supabase auth (replaces fake login)
+  setUser: (user) =>
+    set({
+      user,
+      currentState: user ? 'matching' : 'landing',
+    }),
+
+  logout: () =>
+    set({
+      user: null,
+      currentState: 'landing',
+      selectedDifficulty: null,
+      selectedTopic: null,
+      selectedLanguage: null,
+      matchedPeer: null,
+    }),
+
+  setDifficulty: (difficulty) => set({ selectedDifficulty: difficulty }),
+  setTopic: (topic) => set({ selectedTopic: topic }),
+  setLanguage: (language) => set({ selectedLanguage: language }),
+  setMatchedPeer: (peer) => set({ matchedPeer: peer }),
+  setSessionCode: (code) => set({ sessionCode: code }),
+
+  resetMatching: () =>
+    set({
+      selectedDifficulty: null,
+      selectedTopic: null,
+      matchedPeer: null,
+      currentState: 'matching',
+    }),
 }));
-
-// Hook to sync auth with app store
-export const useSyncAuthStore = () => {
-  const { user } = useAuth();
-  const { setUserInfo, clearUserInfo } = useAppStore();
-
-  if (user) {
-    const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
-    setUserInfo(user.email || '', displayName);
-  } else {
-    clearUserInfo();
-  }
-};

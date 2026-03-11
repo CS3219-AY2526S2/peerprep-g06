@@ -1,20 +1,17 @@
-
 /// <reference types="vite/client" />
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { useAppStore } from '@/store/useAppStore';
 
-// Extend ImportMeta to include env for Vite
 interface ImportMetaEnv {
   readonly VITE_USER_SERVICE_URL: string;
-  // add other env variables here if needed
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-// Define the shape of our auth context
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -24,79 +21,86 @@ interface AuthContextType {
   isAuthenticated: boolean;
 }
 
-// Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Provider component that wraps your app
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const { setUser: setStoreUser, logout: storeLogout } = useAppStore();
 
-  // Check if user is already logged in when app loads
+  // Helper to sync any Supabase user → app store
+  const syncToStore = async (supabaseUser: User | null) => {
+    if (supabaseUser) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('role, is_requesting_admin')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      setStoreUser({
+        id: supabaseUser.id,
+        email: supabaseUser.email || '',
+        name:
+          supabaseUser.user_metadata?.display_name || supabaseUser.email?.split('@')[0] || 'User',
+        role: data?.role ?? 'user',
+        isRequestingAdmin: data?.is_requesting_admin ?? false, // ← add this
+      });
+    } else {
+      storeLogout();
+    }
+  };
+
   useEffect(() => {
     const getSession = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
+      await syncToStore(session?.user ?? null);
       setLoading(false);
     };
 
     getSession();
 
-    // Listen for auth changes (login/logout events)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      syncToStore(session?.user ?? null);
     });
 
     return () => subscription?.unsubscribe();
   }, []);
 
-  // Sign up function - creates new account
   const signUp = async (email: string, password: string, name: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          display_name: name,
-        },
-      },
+      options: { data: { display_name: name } },
     });
 
     if (error) throw error;
 
-    // Call your user service to create the profile
     if (data.user) {
-      const response = await fetch(`${import.meta.env.VITE_USER_SERVICE_URL}/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Upsert profile in case trigger hasn't fired yet
+      await supabase.from('profiles').upsert([
+        {
           id: data.user.id,
           email: data.user.email,
           display_name: name,
-        }),
-      });
+        },
+      ]);
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to create user profile');
-      }
+      await syncToStore(data.user);
     }
   };
 
-  // Sign in function - logs in existing user
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    await syncToStore(data.user);
   };
 
-  // Sign out function - logs out current user
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
@@ -114,7 +118,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Custom hook to use auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
