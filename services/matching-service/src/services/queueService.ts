@@ -5,24 +5,20 @@ const MATCH_TIMEOUT_SECONDS = parseInt(process.env.MATCHING_TIMEOUT || '30000') 
 const QUEUE_MEMBERSHIP_TTL = MATCH_TIMEOUT_SECONDS + 5;
 const MATCH_LOCK_TTL = 5;
 
-function getQueueKey(difficulty: Difficulty, topic: string): string {
-    return `queue:${difficulty}:${topic}`;
+function getQueueKey(difficulty: Difficulty, language: string): string {
+    return `queue:${difficulty}:${language}`;
 }
 
 // adds a user to all their topic queues and stores their request details with a timeout
 export async function addUserToQueue(user: User): Promise<void> {
-    const queueKeys = user.topics.map(topic => getQueueKey(user.difficulty, topic));
+    const queueKey = getQueueKey(user.difficulty, user.language);
+    // add userId as a member to each difficulty:language sorted set, scored by join time (FIFO)
+    await redis.zAdd(queueKey, { score: user.joinedAt.getTime(), value: user.id });
 
-    // add userId as a member to each difficulty:topic sorted set, scored by join time (FIFO)
-    for (const queueKey of queueKeys) {
-        await redis.zAdd(queueKey, { score: user.joinedAt.getTime(), value: user.id });
-    }
-
-    // store full user details in a hash - set ONCE outside the loop
+    // store full user details in a hash
     await redis.hSet(`request:${user.id}`, {
         difficulty: user.difficulty,
-        topics: JSON.stringify(user.topics),
-        languages: JSON.stringify(user.languages),
+        language: user.language,
         joinedAt: user.joinedAt.toISOString(),
         status: 'PENDING',
         socketId: user.socketId,
@@ -31,23 +27,20 @@ export async function addUserToQueue(user: User): Promise<void> {
     await redis.expire(`request:${user.id}`, MATCH_TIMEOUT_SECONDS);
 
     // store queue membership so we know which queues to clean up on timeout
-    await redis.setEx(`queues:${user.id}`, QUEUE_MEMBERSHIP_TTL, JSON.stringify(queueKeys));
+    await redis.setEx(`queues:${user.id}`, QUEUE_MEMBERSHIP_TTL, JSON.stringify(queueKey));
 }
 
 // removes a user from all their queues and cleans up their request and queue membership keys
-export async function removeUserFromQueues(userId: string, queueKeys: string[]): Promise<void> {
-    // remove userId from each sorted set
-    for (const queueKey of queueKeys) {
-        await redis.zRem(queueKey, userId);
-    }
+export async function removeUserFromQueue(userId: string, queueKey: string): Promise<void> {
+    // remove userId from the sorted set
+    await redis.zRem(queueKey, userId);
 
     await redis.del(`request:${userId}`);
-    await redis.del(`queues:${userId}`);
 }
 
 // retrieves all users currently waiting in a specific queue, in FIFO order (oldest first)
-export async function getUsersInQueue(difficulty: Difficulty, topic: string): Promise<User[]> {
-    const queueKey = getQueueKey(difficulty, topic);
+export async function getUsersInQueue(difficulty: Difficulty, language: string): Promise<User[]> {
+    const queueKey = getQueueKey(difficulty, language);
 
     // ZRANGE returns members sorted by score (join timestamp) ascending = FIFO order
     const ids = await redis.zRange(queueKey, 0, -1);
@@ -62,22 +55,21 @@ export async function getUsersInQueue(difficulty: Difficulty, topic: string): Pr
         users.push({
             id,
             difficulty: request.difficulty as Difficulty,
-            topics: JSON.parse(request.topics),
-            languages: JSON.parse(request.languages),
+            language: request.language,
             joinedAt: new Date(request.joinedAt),
             status: request.status as 'PENDING' | 'MATCHED' | 'CANCELLED' | 'TIMED_OUT',
             socketId: request.socketId,
-        });
+            topics: [],
+        } as User);
     }
-
     return users;
 }
 
-// returns the list of queue keys a user is currently enrolled in
-export async function getUserQueueKeys(userId: string): Promise<string[]> {
+// returns the queue key a user is currently enrolled in
+export async function getUserQueueKey(userId: string): Promise<string> {
     const data = await redis.get(`queues:${userId}`);
-    if (!data) return [];
-    return JSON.parse(data) as string[];
+    if (!data) return '';
+    return data as string;
 }
 
 // atomically claims a match lock for a user using SET NX EX (single atomic command)
