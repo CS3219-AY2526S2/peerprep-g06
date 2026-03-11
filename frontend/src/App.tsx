@@ -3,6 +3,7 @@ import Login from '../src/pages/Login';
 import Signup from '../src/pages/Signup';
 import Index from '../src/pages/Index';
 import Match from './pages/Match';
+import Account from './pages/Account';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 const App = () => {
@@ -19,6 +20,14 @@ const App = () => {
         element={
           <ProtectedRoute>
             <Match />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/account"
+        element={
+          <ProtectedRoute>
+            <Account />
           </ProtectedRoute>
         }
       />
