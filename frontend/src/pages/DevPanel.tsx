@@ -54,6 +54,26 @@ const DevPanel = () => {
     }
   };
 
+  const handleApprove = async (requestId: string) => {
+    setActionLoading(requestId);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(USER_ENDPOINTS.approveAdmin(requestId), {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (!response.ok) throw new Error('Failed to approve request');
+      await fetchRequests(); // Refresh the requests list
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="absolute inset-0 gradient-glow opacity-20" />

@@ -68,4 +68,42 @@ export class RequestController {
       res.status(500).json({ error: err.message });
     }
   }
+
+  static async approveAdmin(req: Request, res: Response) {
+    try {
+      const { id: request_id } = req.params;
+
+      // Get the user_id from the request
+      const { data: request, error: fetchError } = await supabase
+        .from('admin_requests')
+        .select('user_id')
+        .eq('id', request_id)
+        .single();
+
+      if (fetchError || !request) {
+        return res.status(404).json({ error: 'Request not found' });
+      }
+
+      // Update admin_requests status
+      const { error: requestError } = await supabase
+        .from('admin_requests')
+        .update({ status: 'approved' })
+        .eq('id', request_id);
+
+      if (requestError) throw requestError;
+
+      // Update profiles role to admin
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ role: 'admin', is_requesting_admin: false })
+        .eq('id', request.user_id);
+
+      if (profileError) throw profileError;
+
+      res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error('Server error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
 }
