@@ -1,10 +1,11 @@
 import { Routes, Route } from 'react-router-dom';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import Login from '../src/pages/Login';
 import Signup from '../src/pages/Signup';
 import Index from '../src/pages/Index';
 import Match from './pages/Match';
 import Account from './pages/Account';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import DevPanel from './pages/DevPanel';
 
 const App = () => {
   return (
@@ -28,6 +29,15 @@ const App = () => {
         element={
           <ProtectedRoute>
             <Account />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/dev-panel"
+        element={
+          <ProtectedRoute>
+            <DevPanel />
           </ProtectedRoute>
         }
       />
