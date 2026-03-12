@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { Code2, ArrowLeft, CheckCircle2, XCircle, Loader2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { USER_ENDPOINTS } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 interface AdminRequest {
   id: string;
@@ -36,8 +37,13 @@ const DevPanel = () => {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const response = await fetch(USER_ENDPOINTS.getAdminRequests);
-      console.log(response);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(USER_ENDPOINTS.getAdminRequests, {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
       if (!response.ok) throw new Error('Failed to fetch requests');
       const data = await response.json();
       setRequests(data);
