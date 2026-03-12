@@ -5,4 +5,5 @@ export const USER_ENDPOINTS = {
   health: `${USER_BASE_URL}/users/health`,
   getAdminRequests: `${USER_BASE_URL}/users/admin-requests`,
   approveAdmin: (requestId: string) => `${USER_BASE_URL}/users/admin-requests/${requestId}/approve`,
+  rejectAdmin: (requestId: string) => `${USER_BASE_URL}/users/admin-requests/${requestId}/reject`,
 };

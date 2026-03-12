@@ -74,6 +74,26 @@ const DevPanel = () => {
     }
   };
 
+  const handleReject = async (requestId: string) => {
+    setActionLoading(requestId);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(USER_ENDPOINTS.rejectAdmin(requestId), {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (!response.ok) throw new Error('Failed to reject request');
+      await fetchRequests(); // Refresh the requests list
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="absolute inset-0 gradient-glow opacity-20" />
@@ -148,7 +168,7 @@ const DevPanel = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleApprove(request.id, request.profiles.id)}
+                      onClick={() => handleApprove(request.id)}
                       disabled={actionLoading === request.id}
                       className="text-success border-success/50 hover:bg-success/10"
                     >
@@ -162,7 +182,7 @@ const DevPanel = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleReject(request.id, request.profiles.id)}
+                      onClick={() => handleReject(request.id)}
                       disabled={actionLoading === request.id}
                       className="text-destructive border-destructive/50 hover:bg-destructive/10"
                     >

@@ -13,5 +13,10 @@ router.patch(
   authenticate('developer'),
   RequestController.approveAdmin,
 );
+router.patch(
+  '/admin-requests/:id/reject',
+  authenticate('developer'),
+  RequestController.rejectAdmin,
+);
 
 export default router;

@@ -106,4 +106,42 @@ export class RequestController {
       res.status(500).json({ error: err.message });
     }
   }
+
+  static async rejectAdmin(req: Request, res: Response) {
+    try {
+      const { id: request_id } = req.params;
+
+      // Get user_id first ← missing in your version
+      const { data: request, error: fetchError } = await supabase
+        .from('admin_requests')
+        .select('user_id')
+        .eq('id', request_id)
+        .single();
+
+      if (fetchError || !request) {
+        return res.status(404).json({ error: 'Request not found' });
+      }
+
+      // Update request status
+      const { error: requestError } = await supabase
+        .from('admin_requests')
+        .update({ status: 'rejected' })
+        .eq('id', request_id);
+
+      if (requestError) throw requestError;
+
+      // Update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_requesting_admin: false })
+        .eq('id', request.user_id); // ← now has user_id
+
+      if (profileError) throw profileError;
+
+      res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error('Server error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
 }
