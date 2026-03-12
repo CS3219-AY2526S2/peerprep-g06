@@ -31,7 +31,7 @@ export class RequestController {
 
   static async requestAdmin(req: Request, res: Response) {
     try {
-      const { user_id } = req.body;
+      const { id: user_id } = req.params;
 
       if (!user_id) {
         return res.status(400).json({ error: 'Missing user_id' });

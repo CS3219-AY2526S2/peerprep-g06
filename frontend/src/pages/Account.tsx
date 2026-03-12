@@ -27,7 +27,7 @@ const Account = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(USER_ENDPOINTS.requestAdmin, {
+      const response = await fetch(USER_ENDPOINTS.requestAdmin(user?.id!), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: user?.id }),
