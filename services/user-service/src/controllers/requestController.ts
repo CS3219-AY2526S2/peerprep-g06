@@ -2,6 +2,33 @@ import { Request, Response } from 'express';
 import { supabase } from '../lib/supabase';
 
 export class RequestController {
+  static async getAdminRequests(req: Request, res: Response) {
+    try {
+      const { data, error } = await supabase
+        .from('admin_requests')
+        .select(
+          `
+        id,
+        status,
+        created_at,
+        profiles (
+          id,
+          email,
+          display_name
+        )
+      `,
+        )
+        .eq('status', 'pending'); // ← only show pending ones
+
+      if (error) throw error;
+
+      res.json(data);
+    } catch (err: any) {
+      console.error('Server error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
   static async requestAdmin(req: Request, res: Response) {
     try {
       const { user_id } = req.body;
