@@ -6,6 +6,7 @@ import Index from '../src/pages/Index';
 import Match from './pages/Match';
 import Account from './pages/Account';
 import DevPanel from './pages/DevPanel';
+import Questions from './pages/Questions';
 
 const App = () => {
   return (
@@ -38,6 +39,15 @@ const App = () => {
         element={
           <ProtectedRoute>
             <DevPanel />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/questions"
+        element={
+          <ProtectedRoute>
+            <Questions />
           </ProtectedRoute>
         }
       />
