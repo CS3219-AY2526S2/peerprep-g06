@@ -68,7 +68,7 @@ app.get('/questions/random', async (_req, res) => {
 })
 
 // POST question
-app.post('/questions', async (req, res) => {
+app.post('/questions/add', async (req, res) => {
   const { data, error } = await supabase
     .from('questions')
     .insert(req.body)
@@ -82,7 +82,7 @@ app.post('/questions', async (req, res) => {
 })
 
 // PUT update question
-app.put('/questions/:id', async (req, res) => {
+app.put('/questions/:id/update', async (req, res) => {
   const { id } = req.params
 
   const { data, error } = await supabase
@@ -103,7 +103,7 @@ app.put('/questions/:id', async (req, res) => {
 })
 
 // DELETE question
-app.delete('/questions/:id', async (req, res) => {
+app.delete('/questions/:id/delete', async (req, res) => {
   const { id } = req.params
 
   const { data, error } = await supabase

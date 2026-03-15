@@ -4,13 +4,14 @@ import { useAppStore } from '@/store/useAppStore';
 import { Code2, ArrowLeft, Plus, Pencil, Trash2, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { QUESTION_ENDPOINTS } from '@/lib/api';
 
 interface Question {
   id: string;
   title: string;
   description: string;
   difficulty: 'easy' | 'medium' | 'hard';
-  topic: string;
+  topic: string[];
 }
 
 const difficultyColors = {
@@ -41,7 +42,19 @@ const Questions = () => {
     fetchQuestions();
   }, [user]);
 
-  const fetchQuestions = async () => {}; //TODO: implement fetching questions from backend
+  const fetchQuestions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(QUESTION_ENDPOINTS.getAllQuestions);
+      const data = await response.json();
+      setQuestions(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openAddModal = () => {
     setEditingQuestion(null);
@@ -55,7 +68,7 @@ const Questions = () => {
       title: question.title,
       description: question.description,
       difficulty: question.difficulty,
-      topic: question.topic,
+      topic: question.topic.join(', '),
     });
     setModalOpen(true);
   };
@@ -66,9 +79,74 @@ const Questions = () => {
     setForm(emptyForm);
   };
 
-  const handleSubmit = async () => {}; //TOOD: implement adding/editing question in backend
+  const handleSubmit = async () => {
+    if (editingQuestion) {
+      editQuestion(editingQuestion.id);
+    } else {
+      addQuestion();
+    }
+  };
 
-  const handleDelete = async () => {}; //TODO: implement deleting question from backend
+  const addQuestion = async () => {
+    try {
+        setFormLoading(true);
+        setError(null);
+        const response = await fetch(QUESTION_ENDPOINTS.addQuestion, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: form.title,
+            description: form.description,
+            difficulty: form.difficulty,
+            topic: form.topic.split(',').map((t) => t.trim()),
+          }),
+        });
+        closeModal();
+        fetchQuestions();
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setFormLoading(false);
+      }
+  };
+
+  const editQuestion = async (questionId: string) => {
+    try {
+        setFormLoading(true);
+        setError(null);
+        const response = await fetch(QUESTION_ENDPOINTS.updateQuestion(questionId), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: form.title,
+            description: form.description,
+            difficulty: form.difficulty,
+            topic: form.topic.split(',').map((t) => t.trim()),
+          }),
+        });
+        closeModal();
+        fetchQuestions();
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setFormLoading(false);
+      }
+  };
+
+  const handleDelete = async (questionId: string) => {
+    try {
+      setDeleteLoading(questionId);
+      setError(null);
+      const response = await fetch(QUESTION_ENDPOINTS.deleteQuestion(questionId), {
+        method: 'DELETE',
+      });
+      fetchQuestions();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setDeleteLoading(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -144,7 +222,7 @@ const Questions = () => {
                     </div>
                     <p className="text-sm text-muted-foreground truncate">{question.description}</p>
                     <p className="text-xs text-muted-foreground mt-1 capitalize">
-                      {question.topic}
+                      {question.topic.join(', ')}
                     </p>
                   </div>
 
