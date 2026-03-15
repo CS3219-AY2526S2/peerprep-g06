@@ -35,7 +35,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
 
-// GET questions
+// GET all questions
 app.get('/questions', async (_req, res) => {
   const { data, error } = await supabase
     .from('questions')
@@ -48,8 +48,27 @@ app.get('/questions', async (_req, res) => {
   res.json(data)
 })
 
+// GET random question
+app.get('/questions/random', async (_req, res) => {
+  const { data, error } = await supabase
+    .from('questions')
+    .select('*')
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  if (!data || data.length === 0) {
+    return res.status(404).json({ error: 'No questions found' })
+  }
+
+  const random = data[Math.floor(Math.random() * data.length)]
+
+  res.json(random)
+})
+
 // POST question
-app.post('/questions', async (req, res) => {
+app.post('/questions/add', async (req, res) => {
   const { data, error } = await supabase
     .from('questions')
     .insert(req.body)
@@ -62,7 +81,49 @@ app.post('/questions', async (req, res) => {
   res.json(data)
 })
 
-const PORT = process.env.PORT || 3001
+// PUT update question
+app.put('/questions/:id/update', async (req, res) => {
+  const { id } = req.params
+
+  const { data, error } = await supabase
+    .from('questions')
+    .update(req.body)
+    .eq('id', id)
+    .select()
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  if (!data || data.length === 0) {
+    return res.status(404).json({ error: 'Question not found' })
+  }
+
+  res.json(data)
+})
+
+// DELETE question
+app.delete('/questions/:id/delete', async (req, res) => {
+  const { id } = req.params
+
+  const { data, error } = await supabase
+    .from('questions')
+    .delete()
+    .eq('id', id)
+    .select()
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  if (!data || data.length === 0) {
+    return res.status(404).json({ error: 'Question not found' })
+  }
+
+  res.json(data)
+})
+
+const PORT = process.env.PORT || 3002
 
 app.listen(PORT, () => {
   console.log(`Question service running on port ${PORT}`)

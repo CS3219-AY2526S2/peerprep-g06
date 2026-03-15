@@ -4,14 +4,32 @@ import { useAppStore } from '@/store/useAppStore';
 import { Code2, ArrowLeft, Plus, Pencil, Trash2, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { QUESTION_ENDPOINTS } from '@/lib/api';
 
 interface Question {
   id: string;
   title: string;
   description: string;
   difficulty: 'easy' | 'medium' | 'hard';
-  topic: string;
+  topic: string[];
 }
+
+const topicColors: Record<string, string> = {
+  arrays_and_hashing: 'text-blue-500 border-blue-500/30 bg-blue-500/10',
+  two_pointers: 'text-cyan-500 border-cyan-500/30 bg-cyan-500/10',
+  stack: 'text-violet-500 border-violet-500/30 bg-violet-500/10',
+  binary_search: 'text-sky-500 border-sky-500/30 bg-sky-500/10',
+  sliding_window: 'text-indigo-500 border-indigo-500/30 bg-indigo-500/10',
+  linked_list: 'text-pink-500 border-pink-500/30 bg-pink-500/10',
+  trees: 'text-teal-500 border-teal-500/30 bg-teal-500/10',
+  tries: 'text-purple-500 border-purple-500/30 bg-purple-500/10',
+  heap_and_priority_queue: 'text-fuchsia-500 border-fuchsia-500/30 bg-fuchsia-500/10',
+  intervals: 'text-rose-500 border-rose-500/30 bg-rose-500/10',
+  greedy: 'text-blue-400 border-blue-400/30 bg-blue-400/10',
+  backtracking: 'text-violet-400 border-violet-400/30 bg-violet-400/10',
+  graphs: 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10',
+  dynamic_programming: 'text-sky-400 border-sky-400/30 bg-sky-400/10',
+};
 
 const difficultyColors = {
   easy: 'text-success border-success/30 bg-success/10',
@@ -19,7 +37,7 @@ const difficultyColors = {
   hard: 'text-destructive border-destructive/30 bg-destructive/10',
 };
 
-const emptyForm = { title: '', description: '', difficulty: 'easy', topic: '' };
+const emptyForm = { title: '', description: '', difficulty: 'easy', topic: [''] };
 
 const Questions = () => {
   const navigate = useNavigate();
@@ -41,7 +59,19 @@ const Questions = () => {
     fetchQuestions();
   }, [user]);
 
-  const fetchQuestions = async () => {}; //TODO: implement fetching questions from backend
+  const fetchQuestions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(QUESTION_ENDPOINTS.getAllQuestions);
+      const data = await response.json();
+      setQuestions(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openAddModal = () => {
     setEditingQuestion(null);
@@ -66,9 +96,74 @@ const Questions = () => {
     setForm(emptyForm);
   };
 
-  const handleSubmit = async () => {}; //TOOD: implement adding/editing question in backend
+  const handleSubmit = async () => {
+    if (editingQuestion) {
+      editQuestion(editingQuestion.id);
+    } else {
+      addQuestion();
+    }
+  };
 
-  const handleDelete = async () => {}; //TODO: implement deleting question from backend
+  const addQuestion = async () => {
+    try {
+        setFormLoading(true);
+        setError(null);
+        const response = await fetch(QUESTION_ENDPOINTS.addQuestion, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: form.title,
+            description: form.description,
+            difficulty: form.difficulty,
+            topic: form.topic,
+          }),
+        });
+        closeModal();
+        fetchQuestions();
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setFormLoading(false);
+      }
+  };
+
+  const editQuestion = async (questionId: string) => {
+    try {
+        setFormLoading(true);
+        setError(null);
+        const response = await fetch(QUESTION_ENDPOINTS.updateQuestion(questionId), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: form.title,
+            description: form.description,
+            difficulty: form.difficulty,
+            topic: form.topic,
+          }),
+        });
+        closeModal();
+        fetchQuestions();
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setFormLoading(false);
+      }
+  };
+
+  const handleDelete = async (questionId: string) => {
+    try {
+      setDeleteLoading(questionId);
+      setError(null);
+      const response = await fetch(QUESTION_ENDPOINTS.deleteQuestion(questionId), {
+        method: 'DELETE',
+      });
+      fetchQuestions();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setDeleteLoading(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -143,9 +238,19 @@ const Questions = () => {
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground truncate">{question.description}</p>
-                    <p className="text-xs text-muted-foreground mt-1 capitalize">
-                      {question.topic}
-                    </p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {question.topic.map((t) => (
+                        <span
+                          key={t}
+                          className={cn(
+                            'text-xs px-2 py-0.5 rounded-full capitalize border shrink-0',
+                            topicColors[t]
+                          )}
+                        >
+                          {t.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
@@ -234,13 +339,28 @@ const Questions = () => {
 
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Topic</label>
-                  <input
-                    type="text"
+                  <select
                     value={form.topic}
-                    onChange={(e) => setForm({ ...form, topic: e.target.value })}
+                    multiple={false} // #Todo: allow multiple topics (with better ui)
+                    onChange={(e) => setForm({ ...form, topic: Array.from(e.target.selectedOptions, option => option.value) })}
                     className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:border-primary transition-colors"
-                    placeholder="arrays"
-                  />
+                  >
+                    <option value="">Select a topic</option>
+                    <option value="arrays_and_hashing">Arrays And Hashing</option>
+                    <option value="two_pointers">Two Pointers</option>
+                    <option value="stack">Stack</option>
+                    <option value="binary_search">Binary Search</option>
+                    <option value="sliding_window">Sliding Window</option>
+                    <option value="linked_list">Linked List</option>
+                    <option value="trees">Trees</option>
+                    <option value="tries">Tries</option>
+                    <option value="heap_and_priority_queue">Heap And Priority Queue</option>
+                    <option value="intervals">Intervals</option>
+                    <option value="greedy">Greedy</option>
+                    <option value="backtracking">Backtracking</option>
+                    <option value="graphs">Graphs</option>
+                    <option value="dynamic_programming">Dynamic Programming</option>
+                  </select>
                 </div>
               </div>
             </div>
