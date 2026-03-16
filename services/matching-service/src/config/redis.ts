@@ -6,8 +6,7 @@ dotenv.config();
 let isConnected: boolean = false;
 let reconnectAttempts: number = 0;
 const maxReconnectAttempts: number = 5;
-
-export const redis: RedisClientType = createClient({
+const clientConfig = {
     username: process.env.REDIS_USERNAME,
     password: process.env.REDIS_PASSWORD,
     socket: {
@@ -23,7 +22,10 @@ export const redis: RedisClientType = createClient({
             return delay;
         }
     },
-});
+}
+
+export const redis = createClient(clientConfig);
+export const pubsub = redis.duplicate();
 
 redis.on('connect', () => {
     isConnected = true;
@@ -57,5 +59,12 @@ redis.on('end', () => {
 export async function connectRedis() {
     await redis.connect();
     await redis.configSet('notify-keyspace-events', 'Ex');
+    logger.info('Redis client configured for keyspace events');
     return redis;
+}
+
+export async function setupRedisSubscription() {
+    await pubsub.connect();
+    logger.info('Redis pubsub connected');
+    return pubsub;
 }
