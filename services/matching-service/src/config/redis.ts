@@ -36,7 +36,7 @@ redis.on('connect', () => {
 redis.on('error', (err: Error) => {
     logger.error('Redis connection error:', err);
     // exit if redis unavailable
-    process.exit(1); 
+    process.exit(1);
 });
 
 redis.on('reconnecting', (delay: number) => {
@@ -57,14 +57,24 @@ redis.on('end', () => {
 });
 
 export async function connectRedis() {
-    await redis.connect();
-    await redis.configSet('notify-keyspace-events', 'Ex');
-    logger.info('Redis client configured for keyspace events');
-    return redis;
+    try {
+        await redis.connect();
+        await redis.configSet('notify-keyspace-events', 'Ex');
+        logger.info('Redis client configured for keyspace events');
+        return redis;
+    } catch (error) {
+        logger.error('Error connecting to redis:', error);
+        throw error;
+    }
 }
 
 export async function setupRedisSubscription() {
-    await pubsub.connect();
-    logger.info('Redis pubsub connected');
-    return pubsub;
+    try {
+        await pubsub.connect();
+        logger.info('Redis pubsub connected');
+        return pubsub;
+    } catch (error) {
+        logger.error('Error setting up redis subscription:', error);
+        throw error;
+    }
 }

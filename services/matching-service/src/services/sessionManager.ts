@@ -48,6 +48,11 @@ async function onRequestExpired(io: Server, userId: string) {
 
 export async function setupSessionManager(io: Server) {
     // listen for expired keys on the pubsub channel
-    pubsub.pSubscribe('__keyevent@0__:expired', (message: string) => handleTimeout(io, message));
+    try {
+        await pubsub.pSubscribe('__keyevent@0__:expired', async (message: string) => await handleTimeout(io, message));
+    } catch (error) {
+        logger.error('Error setting up session manager:', error);
+        throw error;
+    }
     logger.info('Session manager setup complete');
 }
