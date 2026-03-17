@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import { logger } from '../utils/logger';
 dotenv.config();
 
-const client = createClient({
+export const redis = createClient({
     username: process.env.REDIS_USERNAME,
     password: process.env.REDIS_PASSWORD,
     socket: {
@@ -12,18 +12,18 @@ const client = createClient({
     }
 });
 
-client.on('connect', () => {
+redis.on('connect', () => {
     logger.info('Redis client connected');
 });
 
-client.on('error', (err: Error) => {
+redis.on('error', (err: Error) => {
     logger.error('Redis connection error:', err);
     // exit if redis unavailable
     process.exit(1); 
 });
 
 export async function connectRedis() {
-    await client.connect();
+    await redis.connect();
     logger.info('Redis client connected');
-    return client;
+    return redis;
 }
