@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { Code2, ArrowLeft, User, Mail, Shield, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { USER_ENDPOINTS } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 const roleColors = {
   developer: 'text-primary',
@@ -27,9 +28,16 @@ const Account = () => {
     setLoading(true);
     setError(null);
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       const response = await fetch(USER_ENDPOINTS.requestAdmin(user?.id!), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ user_id: user?.id }),
       });
 
