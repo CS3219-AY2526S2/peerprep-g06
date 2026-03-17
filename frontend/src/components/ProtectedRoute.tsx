@@ -1,14 +1,16 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppStore } from '@/store/useAppStore';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requiredRole?: 'user' | 'admin' | 'developer' | ('admin' | 'developer')[];
 }
 
-export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const { isAuthenticated, loading } = useAuth();
+  const { user } = useAppStore();
 
-  // While checking authentication status, show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -17,11 +19,17 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     );
   }
 
-  // If not authenticated, redirect to login
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  // If authenticated, show the protected component
+  // Check role if required
+  if (requiredRole) {
+    const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    if (!roles.includes(user?.role as any)) {
+      return <Navigate to="/match" replace />;
+    }
+  }
+
   return <>{children}</>;
 };

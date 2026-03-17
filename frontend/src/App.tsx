@@ -37,7 +37,7 @@ const App = () => {
       <Route
         path="/dev-panel"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredRole="developer">
             <DevPanel />
           </ProtectedRoute>
         }
