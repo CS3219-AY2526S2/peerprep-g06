@@ -1,3 +1,7 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 const DEFAULT_FRONTEND_ORIGIN = 'http://localhost:8080';
 const DEFAULT_RABBITMQ_URL = 'amqp://localhost:5672';
 

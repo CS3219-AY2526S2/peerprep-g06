@@ -4,6 +4,9 @@ import cors from 'cors';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import { config } from './config/env';
+import { connectRabbitMq } from './config/rabbitmq';
+import { connectRedis } from './config/redis';
+import { startMatchFoundConsumer } from './services/matchFoundConsumer';
 import { logger } from './utils/logger';
 
 dotenv.config();
@@ -40,6 +43,17 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(config.port, () => {
-  logger.info(`Collaboration service listening on port ${config.port}`);
+async function bootstrap() {
+  await connectRedis();
+  const { channel } = await connectRabbitMq();
+  await startMatchFoundConsumer(channel);
+
+  server.listen(config.port, () => {
+    logger.info(`Collaboration service listening on port ${config.port}`);
+  });
+}
+
+bootstrap().catch((error) => {
+  logger.error('Failed to bootstrap collaboration service', error);
+  process.exit(1);
 });
