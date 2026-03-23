@@ -61,3 +61,18 @@ export interface CollaborationSocketServerToClientEvents {
 export interface CollaborationSocketClientToServerEvents {
   'notification:register': (payload: { userId: string }) => void;
 }
+
+export interface SessionJoinedPayload {
+  sessionId: string;
+  userId: string;
+  participantIds: string[];
+  language: string;
+  status: 'pending' | 'active' | 'ended';
+}
+
+export interface CollaborationSessionSocketServerToClientEvents {
+  'session:joined': (payload: SessionJoinedPayload) => void;
+  'session:error': (payload: { message: string }) => void;
+}
+
+export interface CollaborationSessionSocketClientToServerEvents {}

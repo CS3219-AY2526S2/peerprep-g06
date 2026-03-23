@@ -10,8 +10,11 @@ import { connectRabbitMq } from './config/rabbitmq';
 import { connectRedis } from './config/redis';
 import { startMatchFoundConsumer } from './services/matchFoundConsumer';
 import { configureNotificationNamespace } from './services/notificationSocket';
+import { configureSessionNamespace } from './services/sessionSocket';
 import {
   CollaborationSocketClientToServerEvents,
+  CollaborationSessionSocketClientToServerEvents,
+  CollaborationSessionSocketServerToClientEvents,
   CollaborationSocketServerToClientEvents,
 } from './types/contracts';
 import { logger } from './utils/logger';
@@ -38,6 +41,11 @@ app.use(
 app.use(express.json());
 
 configureNotificationNamespace(io);
+const sessionNamespace = io.of('/session') as unknown as import('socket.io').Namespace<
+  CollaborationSessionSocketClientToServerEvents,
+  CollaborationSessionSocketServerToClientEvents
+>;
+configureSessionNamespace(sessionNamespace);
 
 app.get('/health', (_req, res) => {
   res.status(200).json({

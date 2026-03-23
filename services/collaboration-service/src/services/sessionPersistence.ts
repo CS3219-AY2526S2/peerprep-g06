@@ -111,6 +111,30 @@ export async function getSession(sessionId: string): Promise<CollaborationSessio
   return parseJson<CollaborationSession>(await redis.get(collabKeys.session(sessionId)));
 }
 
+export async function saveSession(session: CollaborationSession): Promise<void> {
+  await redis.set(collabKeys.session(session.sessionId), JSON.stringify(session), {
+    EX: sessionTtlSeconds(),
+  });
+}
+
+export async function updateSessionStatus(
+  sessionId: string,
+  status: CollaborationSession['status'],
+): Promise<CollaborationSession | null> {
+  const session = await getSession(sessionId);
+  if (!session) {
+    return null;
+  }
+
+  const updatedSession: CollaborationSession = {
+    ...session,
+    status,
+  };
+
+  await saveSession(updatedSession);
+  return updatedSession;
+}
+
 export async function getQuestionSnapshot(sessionId: string): Promise<QuestionSnapshot | null> {
   return parseJson<QuestionSnapshot>(await redis.get(collabKeys.question(sessionId)));
 }
