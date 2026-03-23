@@ -45,6 +45,7 @@ export const collabKeys = {
   joinToken: (sessionId: string, userId: string) => `collab:session:${sessionId}:token:${userId}`,
   graceTimer: (sessionId: string, userId: string) => `collab:session:${sessionId}:grace:${userId}`,
   pendingDelivery: (userId: string, sessionId: string) => `collab:user:${userId}:delivery:${sessionId}`,
+  pendingDeliveryIndex: (userId: string) => `collab:user:${userId}:deliveries`,
 } as const;
 
 export function hashJoinToken(token: string): string {
@@ -153,9 +154,16 @@ export async function getDocumentSnapshot(sessionId: string): Promise<SessionDoc
 }
 
 export async function savePendingDelivery(record: PendingDeliveryRecord): Promise<void> {
-  await redis.set(collabKeys.pendingDelivery(record.userId, record.sessionId), JSON.stringify(record), {
-    EX: deliveryTtlSeconds(record),
+  const ttlSeconds = deliveryTtlSeconds(record);
+  const transaction = redis.multi();
+
+  transaction.set(collabKeys.pendingDelivery(record.userId, record.sessionId), JSON.stringify(record), {
+    EX: ttlSeconds,
   });
+  transaction.sAdd(collabKeys.pendingDeliveryIndex(record.userId), record.sessionId);
+  transaction.expire(collabKeys.pendingDeliveryIndex(record.userId), ttlSeconds);
+
+  await transaction.exec();
 }
 
 export async function getPendingDelivery(
@@ -166,7 +174,33 @@ export async function getPendingDelivery(
 }
 
 export async function clearPendingDelivery(userId: string, sessionId: string): Promise<void> {
-  await redis.del(collabKeys.pendingDelivery(userId, sessionId));
+  const transaction = redis.multi();
+  transaction.del(collabKeys.pendingDelivery(userId, sessionId));
+  transaction.sRem(collabKeys.pendingDeliveryIndex(userId), sessionId);
+  await transaction.exec();
+}
+
+export async function listPendingDeliveries(userId: string): Promise<PendingDeliveryRecord[]> {
+  const sessionIds = await redis.sMembers(collabKeys.pendingDeliveryIndex(userId));
+  if (sessionIds.length === 0) {
+    return [];
+  }
+
+  const deliveries = await Promise.all(sessionIds.map((sessionId) => getPendingDelivery(userId, sessionId)));
+  const validDeliveries: PendingDeliveryRecord[] = [];
+
+  for (let index = 0; index < sessionIds.length; index += 1) {
+    const delivery = deliveries[index];
+    const sessionId = sessionIds[index];
+
+    if (delivery) {
+      validDeliveries.push(delivery);
+    } else {
+      await redis.sRem(collabKeys.pendingDeliveryIndex(userId), sessionId);
+    }
+  }
+
+  return validDeliveries;
 }
 
 export async function saveGracePeriod(record: GracePeriodRecord): Promise<void> {

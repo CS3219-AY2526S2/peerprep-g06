@@ -70,6 +70,7 @@ function buildSessionSeed(event: MatchFoundEvent): PersistedSessionSeed {
     joinTokens: joinTokens.map((joinToken) => ({
       token: joinToken.token,
       record: {
+        token: joinToken.token,
         tokenHash: hashJoinToken(joinToken.token),
         claims: joinToken.claims,
       },

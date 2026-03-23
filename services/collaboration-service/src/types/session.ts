@@ -1,4 +1,4 @@
-import { JoinTokenClaims, QuestionSnapshot } from './contracts';
+import { JoinTokenClaims, QuestionSnapshot, SessionReadyPayload } from './contracts';
 
 export type ParticipantStatus = 'connected' | 'disconnected' | 'left';
 export type CollaborationSessionStatus = 'pending' | 'active' | 'ended';
@@ -23,6 +23,7 @@ export interface CollaborationSession {
 }
 
 export interface StoredJoinToken {
+  token?: string;
   tokenHash: string;
   claims: JoinTokenClaims;
 }
@@ -39,7 +40,7 @@ export interface PendingDeliveryRecord {
   userId: string;
   sessionId: string;
   type: 'session-ready';
-  payload: Record<string, unknown>;
+  payload: SessionReadyPayload;
   createdAt: string;
   expiresAt: string;
 }

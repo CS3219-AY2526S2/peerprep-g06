@@ -1,6 +1,11 @@
 import { config } from '../config/env';
 import { MatchFoundEvent } from '../types/contracts';
 import { createSessionFromMatchFound } from './sessionStore';
+import {
+  createSessionReadyPayload,
+  deliverSessionReadyIfConnected,
+  queueSessionReadyNotification,
+} from './notificationService';
 import { logger } from '../utils/logger';
 
 function parseMatchFoundEvent(content: Buffer): MatchFoundEvent {
@@ -20,7 +25,7 @@ function parseMatchFoundEvent(content: Buffer): MatchFoundEvent {
   return parsed;
 }
 
-export async function startMatchFoundConsumer(channel: any): Promise<void> {
+export async function startMatchFoundConsumer(channel: any, io: any): Promise<void> {
   await channel.assertExchange(config.rabbitmq.matchFoundExchange, 'topic', {
     durable: true,
   });
@@ -42,6 +47,26 @@ export async function startMatchFoundConsumer(channel: any): Promise<void> {
     try {
       const event = parseMatchFoundEvent(message.content);
       const { sessionId, created } = await createSessionFromMatchFound(event);
+      const sessionReadyPayloads = await Promise.all([
+        createSessionReadyPayload(sessionId, event.user1Id),
+        createSessionReadyPayload(sessionId, event.user2Id),
+      ]);
+
+      for (const payload of sessionReadyPayloads) {
+        if (!payload) {
+          throw new Error(`Failed to build session-ready payload for session ${sessionId}`);
+        }
+      }
+
+      if (created) {
+        for (const payload of sessionReadyPayloads) {
+          await queueSessionReadyNotification(payload!);
+        }
+      }
+
+      for (const payload of sessionReadyPayloads) {
+        await deliverSessionReadyIfConnected(io, payload!.userId, payload!.sessionId);
+      }
 
       logger.info(
         created

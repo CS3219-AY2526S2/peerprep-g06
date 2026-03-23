@@ -7,13 +7,21 @@ import { config } from './config/env';
 import { connectRabbitMq } from './config/rabbitmq';
 import { connectRedis } from './config/redis';
 import { startMatchFoundConsumer } from './services/matchFoundConsumer';
+import { configureNotificationNamespace } from './services/notificationSocket';
+import {
+  CollaborationSocketClientToServerEvents,
+  CollaborationSocketServerToClientEvents,
+} from './types/contracts';
 import { logger } from './utils/logger';
 
 dotenv.config();
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server, {
+const io = new Server<
+  CollaborationSocketClientToServerEvents,
+  CollaborationSocketServerToClientEvents
+>(server, {
   cors: {
     origin: config.frontendOrigin,
     methods: ['GET', 'POST'],
@@ -27,6 +35,8 @@ app.use(
 );
 app.use(express.json());
 
+configureNotificationNamespace(io);
+
 app.get('/health', (_req, res) => {
   res.status(200).json({
     service: 'collaboration-service',
@@ -35,18 +45,10 @@ app.get('/health', (_req, res) => {
   });
 });
 
-io.on('connection', (socket) => {
-  logger.info(`Notification socket connected: ${socket.id}`);
-
-  socket.on('disconnect', (reason) => {
-    logger.info(`Notification socket disconnected: ${socket.id}`, reason);
-  });
-});
-
 async function bootstrap() {
   await connectRedis();
   const { channel } = await connectRabbitMq();
-  await startMatchFoundConsumer(channel);
+  await startMatchFoundConsumer(channel, io);
 
   server.listen(config.port, () => {
     logger.info(`Collaboration service listening on port ${config.port}`);

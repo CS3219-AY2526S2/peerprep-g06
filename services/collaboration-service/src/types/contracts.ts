@@ -38,3 +38,22 @@ export interface JoinTokenClaims {
   issuedAt: string;
   expiresAt: string;
 }
+
+export interface SessionReadyPayload {
+  sessionId: string;
+  userId: string;
+  joinToken: string;
+  gracePeriodMs: number;
+  language: string;
+  question: QuestionSnapshot;
+  websocketUrl: string;
+}
+
+export interface CollaborationSocketServerToClientEvents {
+  'session-ready': (payload: SessionReadyPayload) => void;
+  'notification:error': (payload: { message: string }) => void;
+}
+
+export interface CollaborationSocketClientToServerEvents {
+  'notification:register': (payload: { userId: string }) => void;
+}
