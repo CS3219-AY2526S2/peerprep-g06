@@ -1,58 +1,18 @@
-import { createHash, randomBytes, randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { config } from '../config/env';
-import { redis } from '../config/redis';
-import { JoinTokenClaims, MatchFoundEvent, QuestionSnapshot } from '../types/contracts';
-import { CollaborationSession, SessionParticipant } from '../types/session';
-
-const MATCH_LOCK_TTL_SECONDS = 30;
+import { JoinTokenClaims, MatchFoundEvent } from '../types/contracts';
+import { CollaborationSession, PersistedSessionSeed, SessionParticipant } from '../types/session';
+import {
+  claimMatchSessionLock,
+  getSessionIdByMatchId,
+  hashJoinToken,
+  persistSessionSeed,
+  releaseMatchSessionLock,
+} from './sessionPersistence';
 
 interface JoinTokenRecord {
   token: string;
   claims: JoinTokenClaims;
-}
-
-interface SessionSeed {
-  session: CollaborationSession;
-  participants: SessionParticipant[];
-  question: QuestionSnapshot;
-  document: {
-    language: string;
-    content: string;
-    updatedAt: string;
-  };
-  joinTokens: JoinTokenRecord[];
-}
-
-function getMatchSessionKey(matchId: string): string {
-  return `collab:match:${matchId}:session`;
-}
-
-function getMatchLockKey(matchId: string): string {
-  return `collab:lock:match:${matchId}`;
-}
-
-function getSessionKey(sessionId: string): string {
-  return `collab:session:${sessionId}`;
-}
-
-function getParticipantsKey(sessionId: string): string {
-  return `collab:session:${sessionId}:participants`;
-}
-
-function getQuestionKey(sessionId: string): string {
-  return `collab:session:${sessionId}:question`;
-}
-
-function getDocumentKey(sessionId: string): string {
-  return `collab:session:${sessionId}:doc`;
-}
-
-function getJoinTokenKey(sessionId: string, userId: string): string {
-  return `collab:session:${sessionId}:token:${userId}`;
-}
-
-function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
 }
 
 function getStarterCode(event: MatchFoundEvent): string {
@@ -72,7 +32,7 @@ function createJoinToken(matchId: string, sessionId: string, userId: string, now
   return { token, claims };
 }
 
-function buildSessionSeed(event: MatchFoundEvent): SessionSeed {
+function buildSessionSeed(event: MatchFoundEvent): PersistedSessionSeed {
   const createdAt = new Date().toISOString();
   const sessionId = randomUUID();
   const session: CollaborationSession = {
@@ -101,16 +61,20 @@ function buildSessionSeed(event: MatchFoundEvent): SessionSeed {
     participants,
     question: event.question,
     document: {
+      sessionId,
       language: event.language,
       content: getStarterCode(event),
+      format: 'plain-text',
       updatedAt: createdAt,
     },
-    joinTokens,
+    joinTokens: joinTokens.map((joinToken) => ({
+      token: joinToken.token,
+      record: {
+        tokenHash: hashJoinToken(joinToken.token),
+        claims: joinToken.claims,
+      },
+    })),
   };
-}
-
-export async function getSessionIdByMatchId(matchId: string): Promise<string | null> {
-  return redis.get(getMatchSessionKey(matchId));
 }
 
 export async function createSessionFromMatchFound(event: MatchFoundEvent): Promise<{
@@ -122,12 +86,9 @@ export async function createSessionFromMatchFound(event: MatchFoundEvent): Promi
     return { sessionId: existingSessionId, created: false };
   }
 
-  const lockAcquired = await redis.set(getMatchLockKey(event.matchId), '1', {
-    NX: true,
-    EX: MATCH_LOCK_TTL_SECONDS,
-  });
+  const lockAcquired = await claimMatchSessionLock(event.matchId);
 
-  if (lockAcquired !== 'OK') {
+  if (!lockAcquired) {
     const sessionId = await getSessionIdByMatchId(event.matchId);
     if (sessionId) {
       return { sessionId, created: false };
@@ -143,42 +104,10 @@ export async function createSessionFromMatchFound(event: MatchFoundEvent): Promi
     }
 
     const seed = buildSessionSeed(event);
-    const sessionTtlSeconds = Math.ceil(config.joinTokenTtlMs / 1000) + 300;
-    const transaction = redis.multi();
-
-    transaction.set(getMatchSessionKey(event.matchId), seed.session.sessionId, {
-      EX: sessionTtlSeconds,
-    });
-    transaction.set(getSessionKey(seed.session.sessionId), JSON.stringify(seed.session), {
-      EX: sessionTtlSeconds,
-    });
-    transaction.set(getParticipantsKey(seed.session.sessionId), JSON.stringify(seed.participants), {
-      EX: sessionTtlSeconds,
-    });
-    transaction.set(getQuestionKey(seed.session.sessionId), JSON.stringify(seed.question), {
-      EX: sessionTtlSeconds,
-    });
-    transaction.set(getDocumentKey(seed.session.sessionId), JSON.stringify(seed.document), {
-      EX: sessionTtlSeconds,
-    });
-
-    for (const record of seed.joinTokens) {
-      transaction.set(
-        getJoinTokenKey(seed.session.sessionId, record.claims.userId),
-        JSON.stringify({
-          tokenHash: hashToken(record.token),
-          claims: record.claims,
-        }),
-        {
-          PX: config.joinTokenTtlMs,
-        },
-      );
-    }
-
-    await transaction.exec();
+    await persistSessionSeed(event.matchId, seed);
 
     return { sessionId: seed.session.sessionId, created: true };
   } finally {
-    await redis.del(getMatchLockKey(event.matchId));
+    await releaseMatchSessionLock(event.matchId);
   }
 }
