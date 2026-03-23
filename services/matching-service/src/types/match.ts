@@ -1,16 +1,15 @@
-import { Difficulty } from "./user";
-
+import { Difficulty } from './user';
+import { Question } from './question';
 export interface Match {
     id: string;
     user1Id: string;
     user2Id: string;
     commonTopic: string;
-    questionId: string;
+    question: Question;
     difficulty: Difficulty;
     commonLanguage: string;
     createdAt: Date;
     status: MatchStatus;
-    sessionId: string;
 }
 
 export enum MatchStatus {

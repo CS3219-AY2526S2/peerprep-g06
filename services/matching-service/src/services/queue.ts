@@ -100,12 +100,11 @@ export async function storeMatch(match: Match): Promise<void> {
         user1Id: match.user1Id,
         user2Id: match.user2Id,
         commonTopic: match.commonTopic,
-        questionId: match.questionId,
+        question: JSON.stringify(match.question),
         difficulty: match.difficulty,
         commonLanguage: match.commonLanguage,
         createdAt: match.createdAt.getTime(),
         status: match.status,
-        sessionId: match.sessionId,
     });
 
     await redis.expire(`match:${match.id}`, MATCH_HANDOFF_TTL);
