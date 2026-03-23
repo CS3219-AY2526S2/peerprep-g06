@@ -1,3 +1,4 @@
+// Internal collaboration-service domain models.
 import { JoinTokenClaims, QuestionSnapshot, SessionReadyPayload } from './contracts';
 
 export type ParticipantStatus = 'connected' | 'disconnected' | 'left';
@@ -12,6 +13,7 @@ export interface SessionParticipant {
 }
 
 export interface CollaborationSession {
+  // Core session record created from a match and used as the anchor for all other persisted collaboration data.
   sessionId: string;
   matchId: string;
   user1Id: string;
@@ -23,12 +25,14 @@ export interface CollaborationSession {
 }
 
 export interface StoredJoinToken {
+  // The raw token is kept for session-ready delivery; the hash is the value used for later verification.
   token?: string;
   tokenHash: string;
   claims: JoinTokenClaims;
 }
 
 export interface SessionDocumentSnapshot {
+  // This starts as plain starter code and can later evolve into persisted Yjs state.
   sessionId: string;
   language: string;
   content: string;
@@ -37,6 +41,7 @@ export interface SessionDocumentSnapshot {
 }
 
 export interface PendingDeliveryRecord {
+  // Offline-safe notification record for queue-stage events such as session-ready.
   userId: string;
   sessionId: string;
   type: 'session-ready';
@@ -46,6 +51,7 @@ export interface PendingDeliveryRecord {
 }
 
 export interface GracePeriodRecord {
+  // Reconnect grace-period state is stored separately so disconnect handling can be made idempotent later.
   sessionId: string;
   userId: string;
   createdAt: string;
@@ -53,6 +59,7 @@ export interface GracePeriodRecord {
 }
 
 export interface PersistedSessionSeed {
+  // All records that are written together when a new collaboration session is created.
   session: CollaborationSession;
   participants: SessionParticipant[];
   question: QuestionSnapshot;

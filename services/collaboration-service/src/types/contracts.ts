@@ -1,3 +1,5 @@
+// Shared contract shapes used inside collaboration-service.
+// These mirror the cross-service payloads that matching/gateway/frontend are expected to understand.
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export interface QuestionImage {
@@ -20,6 +22,7 @@ export interface QuestionSnapshot {
 }
 
 export interface MatchFoundEvent {
+  // This is the event collaboration-service consumes from RabbitMQ when matching has found a pair.
   eventVersion: 1;
   matchId: string;
   user1Id: string;
@@ -40,6 +43,7 @@ export interface JoinTokenClaims {
 }
 
 export interface SessionReadyPayload {
+  // This is the payload eventually pushed to each matched user before they enter the live session room.
   sessionId: string;
   userId: string;
   joinToken: string;

@@ -1,3 +1,5 @@
+// Redis-backed persistence layer for collaboration state.
+// This file owns the key layout and the read/write helpers used by later commits.
 import { createHash } from 'crypto';
 import { config } from '../config/env';
 import { redis } from '../config/redis';
@@ -15,6 +17,7 @@ import {
 const MATCH_LOCK_TTL_SECONDS = 30;
 
 function sessionTtlSeconds(): number {
+  // Session data should outlive join-token delivery slightly so reconnect and inspection still work.
   return Math.ceil(config.joinTokenTtlMs / 1000) + 300;
 }
 
@@ -36,14 +39,17 @@ function parseJson<T>(value: string | null): T | null {
 }
 
 export const collabKeys = {
+  // Match/session mapping is the idempotency anchor for match handoff.
   matchSession: (matchId: string) => `collab:match:${matchId}:session`,
   matchLock: (matchId: string) => `collab:lock:match:${matchId}`,
+  // Session-scoped records keep metadata, participants, question state, and document state together.
   session: (sessionId: string) => `collab:session:${sessionId}`,
   participants: (sessionId: string) => `collab:session:${sessionId}:participants`,
   question: (sessionId: string) => `collab:session:${sessionId}:question`,
   document: (sessionId: string) => `collab:session:${sessionId}:doc`,
   joinToken: (sessionId: string, userId: string) => `collab:session:${sessionId}:token:${userId}`,
   graceTimer: (sessionId: string, userId: string) => `collab:session:${sessionId}:grace:${userId}`,
+  // Pending deliveries are indexed per user so they can be replayed on reconnect.
   pendingDelivery: (userId: string, sessionId: string) => `collab:user:${userId}:delivery:${sessionId}`,
   pendingDeliveryIndex: (userId: string) => `collab:user:${userId}:deliveries`,
 } as const;
@@ -70,6 +76,7 @@ export async function getSessionIdByMatchId(matchId: string): Promise<string | n
 }
 
 export async function persistSessionSeed(matchId: string, seed: PersistedSessionSeed): Promise<void> {
+  // The first session write is done as one Redis transaction so the service never sees a half-created session.
   const ttlSeconds = sessionTtlSeconds();
   const transaction = redis.multi();
 
@@ -123,6 +130,7 @@ export async function updateParticipantPresence(
   userId: string,
   update: Partial<SessionParticipant>,
 ): Promise<SessionParticipant | null> {
+  // Presence updates are done by rewriting the session's participant array for now.
   const participants = await getParticipants(sessionId);
   if (!participants) {
     return null;
@@ -154,6 +162,7 @@ export async function getDocumentSnapshot(sessionId: string): Promise<SessionDoc
 }
 
 export async function savePendingDelivery(record: PendingDeliveryRecord): Promise<void> {
+  // Every pending delivery has both a record key and a per-user index entry for replay scans.
   const ttlSeconds = deliveryTtlSeconds(record);
   const transaction = redis.multi();
 
@@ -181,6 +190,7 @@ export async function clearPendingDelivery(userId: string, sessionId: string): P
 }
 
 export async function listPendingDeliveries(userId: string): Promise<PendingDeliveryRecord[]> {
+  // Missing records are cleaned out of the index lazily when the user reconnects.
   const sessionIds = await redis.sMembers(collabKeys.pendingDeliveryIndex(userId));
   if (sessionIds.length === 0) {
     return [];

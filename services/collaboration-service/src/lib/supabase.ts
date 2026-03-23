@@ -1,3 +1,5 @@
+// Minimal Supabase auth helper used to verify notification sockets.
+// We call the Auth API directly with the service key instead of pulling user-service into this service.
 import { config } from '../config/env';
 
 interface SupabaseUserResponse {

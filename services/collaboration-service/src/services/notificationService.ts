@@ -1,3 +1,5 @@
+// Notification delivery helpers.
+// This service builds session-ready payloads, stores them for replay, and emits them to connected users.
 import { Server } from 'socket.io';
 import { config } from '../config/env';
 import {
@@ -23,6 +25,7 @@ function buildDeliveryExpiry(): string {
 }
 
 export async function createSessionReadyPayload(sessionId: string, userId: string): Promise<SessionReadyPayload | null> {
+  // A session-ready payload is assembled from the persisted session, question, and per-user join token.
   const [session, question, tokenRecord] = await Promise.all([
     getSession(sessionId),
     getQuestionSnapshot(sessionId),
@@ -45,6 +48,7 @@ export async function createSessionReadyPayload(sessionId: string, userId: strin
 }
 
 export async function queueSessionReadyNotification(payload: SessionReadyPayload): Promise<void> {
+  // Delivery is queued first so reconnect/retry paths do not depend on the user already being online.
   await savePendingDelivery({
     userId: payload.userId,
     sessionId: payload.sessionId,
@@ -56,6 +60,7 @@ export async function queueSessionReadyNotification(payload: SessionReadyPayload
 }
 
 export async function deliverPendingNotifications(io: Server, userId: string): Promise<void> {
+  // Replays any notifications that were queued while the user was offline.
   const pendingDeliveries = await listPendingDeliveries(userId);
 
   for (const delivery of pendingDeliveries) {
@@ -70,6 +75,7 @@ export async function deliverSessionReadyIfConnected(
   userId: string,
   sessionId: string,
 ): Promise<void> {
+  // Fast path for users who are already sitting on the notification socket when the match is processed.
   const room = io.sockets.adapter.rooms.get(getUserRoom(userId));
   if (!room || room.size === 0) {
     return;
@@ -86,6 +92,7 @@ export async function deliverSessionReadyIfConnected(
 }
 
 export function registerNotificationSocket(socket: any, userId: string): void {
+  // Rooms give us a stable per-user delivery target even if the concrete socket id changes.
   socket.join(getUserRoom(userId));
   logger.info(`Registered notification socket ${socket.id} for user ${userId}`);
 }

@@ -1,3 +1,5 @@
+// RabbitMQ consumer for match handoff events.
+// It creates the session, queues session-ready notifications, and delivers them immediately if possible.
 import { config } from '../config/env';
 import { MatchFoundEvent } from '../types/contracts';
 import { createSessionFromMatchFound } from './sessionStore';
@@ -9,6 +11,7 @@ import {
 import { logger } from '../utils/logger';
 
 function parseMatchFoundEvent(content: Buffer): MatchFoundEvent {
+  // Keep validation small here; deeper domain assumptions stay inside session creation/persistence.
   const parsed = JSON.parse(content.toString()) as MatchFoundEvent;
 
   if (
@@ -47,6 +50,7 @@ export async function startMatchFoundConsumer(channel: any, io: any): Promise<vo
     try {
       const event = parseMatchFoundEvent(message.content);
       const { sessionId, created } = await createSessionFromMatchFound(event);
+      // Build one delivery payload per matched user from the data persisted during session creation.
       const sessionReadyPayloads = await Promise.all([
         createSessionReadyPayload(sessionId, event.user1Id),
         createSessionReadyPayload(sessionId, event.user2Id),
@@ -59,11 +63,13 @@ export async function startMatchFoundConsumer(channel: any, io: any): Promise<vo
       }
 
       if (created) {
+        // New sessions always queue the notification first so reconnect paths can replay it safely.
         for (const payload of sessionReadyPayloads) {
           await queueSessionReadyNotification(payload!);
         }
       }
 
+      // If the user is already online on the notification socket, deliver immediately and clear the pending record.
       for (const payload of sessionReadyPayloads) {
         await deliverSessionReadyIfConnected(io, payload!.userId, payload!.sessionId);
       }

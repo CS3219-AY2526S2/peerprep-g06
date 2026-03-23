@@ -1,3 +1,5 @@
+// Shared RabbitMQ connection helper.
+// The service opens one connection/channel pair and reuses it across consumers.
 import amqp from 'amqplib';
 import { config } from './env';
 import { logger } from '../utils/logger';

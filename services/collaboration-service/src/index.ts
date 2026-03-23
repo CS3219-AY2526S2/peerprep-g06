@@ -1,3 +1,5 @@
+// Main collaboration-service entrypoint.
+// Boots HTTP health checks, the notification socket namespace, Redis, and the MatchFound consumer.
 import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
@@ -46,6 +48,7 @@ app.get('/health', (_req, res) => {
 });
 
 async function bootstrap() {
+  // Infrastructure dependencies are required before the service can consume match events safely.
   await connectRedis();
   const { channel } = await connectRabbitMq();
   await startMatchFoundConsumer(channel, io);

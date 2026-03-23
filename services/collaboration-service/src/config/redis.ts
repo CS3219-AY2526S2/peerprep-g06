@@ -1,3 +1,4 @@
+// Shared Redis client used by the collaboration persistence layer.
 import { createClient } from 'redis';
 import { config } from './env';
 import { logger } from '../utils/logger';
@@ -20,6 +21,7 @@ redis.on('error', (error: Error) => {
 });
 
 export async function connectRedis() {
+  // Avoid reconnecting if bootstrap or tests call this more than once.
   if (!redis.isOpen) {
     await redis.connect();
   }

@@ -1,3 +1,4 @@
+// Small logger shared across the collaboration service.
 enum LogLevel {
   DEBUG = 'DEBUG',
   INFO = 'INFO',

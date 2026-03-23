@@ -1,3 +1,5 @@
+// Session creation orchestration.
+// This module turns a MatchFound event into the initial session seed that gets persisted in Redis.
 import { randomBytes, randomUUID } from 'crypto';
 import { config } from '../config/env';
 import { JoinTokenClaims, MatchFoundEvent } from '../types/contracts';
@@ -16,10 +18,12 @@ interface JoinTokenRecord {
 }
 
 function getStarterCode(event: MatchFoundEvent): string {
+  // Session creation starts from deterministic starter code for the chosen language.
   return event.question.starterCodeByLanguage[event.language] ?? '';
 }
 
 function createJoinToken(matchId: string, sessionId: string, userId: string, nowIso: string): JoinTokenRecord {
+  // Join tokens are generated here, then their verification record is stored in Redis.
   const token = randomBytes(32).toString('base64url');
   const claims: JoinTokenClaims = {
     sessionId,
@@ -33,6 +37,8 @@ function createJoinToken(matchId: string, sessionId: string, userId: string, now
 }
 
 function buildSessionSeed(event: MatchFoundEvent): PersistedSessionSeed {
+  // The seed is the full "first write" for a collaboration session:
+  // metadata, participants, question, initial document, and per-user join tokens.
   const createdAt = new Date().toISOString();
   const sessionId = randomUUID();
   const session: CollaborationSession = {
@@ -82,6 +88,7 @@ export async function createSessionFromMatchFound(event: MatchFoundEvent): Promi
   sessionId: string;
   created: boolean;
 }> {
+  // First check is the fast idempotency path for redelivered MatchFound messages.
   const existingSessionId = await getSessionIdByMatchId(event.matchId);
   if (existingSessionId) {
     return { sessionId: existingSessionId, created: false };
@@ -90,6 +97,7 @@ export async function createSessionFromMatchFound(event: MatchFoundEvent): Promi
   const lockAcquired = await claimMatchSessionLock(event.matchId);
 
   if (!lockAcquired) {
+    // Another worker may already be creating the same session under the match-level lock.
     const sessionId = await getSessionIdByMatchId(event.matchId);
     if (sessionId) {
       return { sessionId, created: false };
@@ -99,6 +107,7 @@ export async function createSessionFromMatchFound(event: MatchFoundEvent): Promi
   }
 
   try {
+    // Recheck after the lock in case another consumer finished before we entered the critical section.
     const recheckedSessionId = await getSessionIdByMatchId(event.matchId);
     if (recheckedSessionId) {
       return { sessionId: recheckedSessionId, created: false };

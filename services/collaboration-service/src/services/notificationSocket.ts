@@ -1,3 +1,4 @@
+// Socket.IO notification namespace for pre-session events such as "session-ready".
 import { Server } from 'socket.io';
 import {
   CollaborationSocketClientToServerEvents,
@@ -13,6 +14,7 @@ type NotificationServer = Server<
 >;
 
 function getBearerToken(socket: any): string | null {
+  // Frontends can provide the access token either via socket auth payload or Authorization header.
   const authToken = socket.handshake.auth?.token;
   if (typeof authToken === 'string' && authToken.length > 0) {
     return authToken;
@@ -27,6 +29,7 @@ function getBearerToken(socket: any): string | null {
 }
 
 export function configureNotificationNamespace(io: NotificationServer): void {
+  // Every client-facing notification socket is authenticated before it can register for user-targeted events.
   io.use(async (socket, next) => {
     try {
       const token = getBearerToken(socket);
@@ -52,6 +55,7 @@ export function configureNotificationNamespace(io: NotificationServer): void {
     logger.info(`Notification socket connected: ${socket.id} for user ${authenticatedUserId}`);
 
     socket.on('notification:register', async (payload: { userId: string }) => {
+      // The socket is already authenticated, so registration is just binding that socket to the user's room.
       if (!payload?.userId || payload.userId !== authenticatedUserId) {
         socket.emit('notification:error', { message: 'User registration mismatch' });
         return;
