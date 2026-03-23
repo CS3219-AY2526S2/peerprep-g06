@@ -75,7 +75,6 @@ app.get('/questions/random/:difficulty/:topic', async (req, res) => {
     .select('*')
     .eq('difficulty', difficulty)
     .contains('topic', [topic])
-    .limit(1)
 
   if (error) {
     return res.status(500).json({ error: error.message })
@@ -85,7 +84,9 @@ app.get('/questions/random/:difficulty/:topic', async (req, res) => {
     return res.status(404).json({ error: 'No questions found' })
   }
 
-  res.json(data[0])
+  const random = data[Math.floor(Math.random() * data.length)]
+
+  res.json(random)
 })
 
 // POST question
