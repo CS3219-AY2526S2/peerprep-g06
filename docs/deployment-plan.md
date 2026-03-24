@@ -9,7 +9,6 @@ This deployment plan assumes:
 - `nginx` is used as the API gateway
 - Supabase remains an external managed dependency
 - Redis remains external or is moved to AWS-managed Redis later
-- there is only one production environment for now
 
 ## Deployable Units
 
@@ -84,6 +83,28 @@ Create one VPC with:
 ### Service discovery
 
 Use ECS Service Connect or Cloud Map so `nginx` can reach backend services by stable internal names.
+
+## Local Development
+
+### Local orchestration
+
+For local development, `docker-compose.yml` should be treated as a local-only stack and not as production deployment configuration.
+
+The current local backend defaults are:
+
+- `user-service` -> `3001`
+- `question-service` -> `3002`
+- `matching-service` -> `3003`
+
+### Local configuration source
+
+Local Docker Compose configuration is sourced from the root `.env` file. The tracked `.env.example` documents the expected local variables for:
+
+- Supabase URLs and service keys
+- Redis connectivity
+- local host port mappings
+
+Per-service `.env.example` files are still useful as service-level configuration documentation, but the Compose stack itself is driven from the root `.env`.
 
 ## Frontend Deployment
 
