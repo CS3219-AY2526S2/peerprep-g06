@@ -14,7 +14,8 @@
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
     "redis": "^5.10.0",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "yjs": "^13.6.27"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.7",

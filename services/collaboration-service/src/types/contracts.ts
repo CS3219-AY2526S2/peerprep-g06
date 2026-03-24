@@ -70,9 +70,25 @@ export interface SessionJoinedPayload {
   status: 'pending' | 'active' | 'ended';
 }
 
+export interface SessionDocumentSyncPayload {
+  sessionId: string;
+  language: string;
+  update: string;
+  updatedAt: string;
+  format: 'yjs-update-base64';
+}
+
+export interface SessionDocumentUpdatePayload {
+  update: string;
+}
+
 export interface CollaborationSessionSocketServerToClientEvents {
   'session:joined': (payload: SessionJoinedPayload) => void;
   'session:error': (payload: { message: string }) => void;
+  'doc:sync': (payload: SessionDocumentSyncPayload) => void;
+  'doc:update': (payload: SessionDocumentSyncPayload & { userId: string }) => void;
 }
 
-export interface CollaborationSessionSocketClientToServerEvents {}
+export interface CollaborationSessionSocketClientToServerEvents {
+  'doc:update': (payload: SessionDocumentUpdatePayload) => void;
+}

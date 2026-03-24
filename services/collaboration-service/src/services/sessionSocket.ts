@@ -5,6 +5,7 @@ import { getSupabaseUser } from '../lib/supabase';
 import {
   CollaborationSessionSocketClientToServerEvents,
   CollaborationSessionSocketServerToClientEvents,
+  SessionDocumentUpdatePayload,
   SessionJoinedPayload,
 } from '../types/contracts';
 import {
@@ -16,6 +17,7 @@ import {
   updateParticipantPresence,
   updateSessionStatus,
 } from './sessionPersistence';
+import { applyDocumentUpdate, getDocumentSyncPayload } from './documentSyncService';
 import { logger } from '../utils/logger';
 
 type SessionNamespace = Namespace<
@@ -141,7 +143,27 @@ export function configureSessionNamespace(namespace: SessionNamespace): void {
     };
 
     socket.emit('session:joined', joinedPayload);
+    socket.emit('doc:sync', await getDocumentSyncPayload(sessionId));
     logger.info(`Session socket connected: ${socket.id} for user ${userId} in session ${sessionId}`);
+
+    socket.on('doc:update', async (payload: SessionDocumentUpdatePayload) => {
+      try {
+        if (!payload?.update) {
+          socket.emit('session:error', { message: 'Missing document update payload' });
+          return;
+        }
+
+        const documentUpdate = await applyDocumentUpdate(sessionId, payload.update);
+
+        socket.to(getSessionRoom(sessionId)).emit('doc:update', {
+          ...documentUpdate,
+          userId,
+        });
+      } catch (error) {
+        logger.error(`Failed to apply Yjs update for session ${sessionId}`, error);
+        socket.emit('session:error', { message: 'Failed to apply document update' });
+      }
+    });
 
     socket.on('disconnect', (reason: string) => {
       logger.info(`Session socket disconnected: ${socket.id}`, reason);

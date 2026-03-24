@@ -32,7 +32,7 @@ export interface StoredJoinToken {
 }
 
 export interface SessionDocumentSnapshot {
-  // This starts as plain starter code and can later evolve into persisted Yjs state.
+  // This starts as plain starter code and later migrates to persisted Yjs document state.
   sessionId: string;
   language: string;
   content: string;
