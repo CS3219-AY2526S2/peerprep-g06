@@ -1,15 +1,51 @@
+# local development stack only
+# prod deployment handled separately through AWS infrastructure
 services:
+  user-service:
+    build: ./services/user-service
+    container_name: peerprep-user-service
+    ports:
+      - "${USER_SERVICE_PORT:-3001}:3001"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - PORT=3001
+      - NODE_ENV=development
+    volumes:
+      - ./services/user-service:/app
+      - /app/node_modules
+    networks:
+      - peerprep-network
+    command: npm run dev
+
+  question-service:
+    build: ./services/question-service
+    container_name: peerprep-question-service
+    ports:
+      - "${QUESTION_SERVICE_PORT:-3002}:3002"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - PORT=3002
+      - NODE_ENV=development
+    volumes:
+      - ./services/question-service:/app
+      - /app/node_modules
+    networks:
+      - peerprep-network
+    command: npm run dev
+
   matching-service:
     build: ./services/matching-service
     container_name: peerprep-matching-service
     ports:
-      - '${MATCHING_SERVICE_PORT:-3002}:${MATCHING_SERVICE_PORT:-3002}'
+      - "${MATCHING_SERVICE_PORT:-3003}:3003"
     environment:
       - REDIS_USERNAME=${REDIS_USERNAME}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
-      - MATCHING_SERVICE_PORT=${MATCHING_SERVICE_PORT:-3002}
+      - MATCHING_SERVICE_PORT=3003
       - NODE_ENV=development
       - MATCHING_TIMEOUT=3000
       - LOG_LEVEL=debug
