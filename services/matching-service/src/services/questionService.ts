@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { Question } from '../types/question';
+import { Question } from '@shared/types';
 
 const QUESTION_SERVICE_URL = process.env.QUESTION_SERVICE_URL || 'http://localhost:3003';
 

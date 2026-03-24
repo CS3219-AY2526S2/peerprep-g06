@@ -1,6 +1,6 @@
 import { redis } from '../config/redis';
-import { Match, MatchStatus } from '../types/match';
-import { User, Difficulty } from '../types/user';
+import { Match, MatchStatus, Difficulty } from '@shared/types';
+import { User } from '../types/user';
 import { MATCH_LOCK_TTL, MATCH_PENDING_TTL, MATCH_MATCHED_TTL, MATCH_HANDOFF_TTL, MATCH_TIMEOUT_TTL } from '../types/constants';
 
 // returns the queue key for a given difficulty and language

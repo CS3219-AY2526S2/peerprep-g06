@@ -1,4 +1,6 @@
-import { MatchStatus } from "./match";
+import { MatchStatus, Difficulty } from "@shared/types";
+
+export { Difficulty };
 
 export interface User {
     id: string;
@@ -8,10 +10,4 @@ export interface User {
     language: string;
     joinedAt: Date;
     status: MatchStatus;
-}
-
-export enum Difficulty {
-    EASY = 'easy',
-    MEDIUM = 'medium',
-    HARD = 'hard',
 }
