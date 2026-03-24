@@ -40,7 +40,7 @@ io.on('disconnect', (socket) => {
 });
 
 
-const PORT = process.env.MATCHING_SERVICE_PORT || 3002;
+const PORT = process.env.MATCHING_SERVICE_PORT || 3003;
 
 async function startServer() {
     try {

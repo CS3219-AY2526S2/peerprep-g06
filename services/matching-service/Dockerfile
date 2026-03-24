@@ -1,18 +1,17 @@
-FROM node:18-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+RUN npm ci
 
-# Copy source code
 COPY . .
 
-# Expose port
-EXPOSE ${REDIS_PORT}
+RUN npm run build && npm prune --omit=dev
 
-# Default command (can be overridden by docker-compose)
-CMD ["npm", "run", "dev"]
+ENV NODE_ENV=production
+
+EXPOSE 3003
+
+CMD ["npm", "start"]
