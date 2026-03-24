@@ -6,6 +6,7 @@ import cors from 'cors';
 import { logger } from './utils/logger';
 import { connectRedis, setupRedisSubscription } from './config/redis';
 import { setupSessionManager } from './services/sessionManager';
+import { setupTopicExchange } from '@shared/rabbitmq';
 
 // load environment variables
 dotenv.config();
@@ -47,6 +48,7 @@ async function startServer() {
         await connectRedis();
         await setupRedisSubscription();
         await setupSessionManager(io);
+        await setupTopicExchange();
         logger.info('Redis subscription setup complete');
         server.listen(PORT, () => {
             logger.info(`Matching service listening on port ${PORT}`);
