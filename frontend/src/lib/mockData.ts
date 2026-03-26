@@ -8,14 +8,20 @@ export const languages = [
 ] as const;
 
 export const topics = [
-  { id: 'arrays', label: 'Arrays & Strings', icon: '📊' },
-  { id: 'linked-lists', label: 'Linked Lists', icon: '🔗' },
-  { id: 'trees', label: 'Trees & Graphs', icon: '🌳' },
-  { id: 'dynamic-programming', label: 'Dynamic Programming', icon: '📈' },
-  { id: 'sorting', label: 'Sorting & Searching', icon: '🔍' },
-  { id: 'recursion', label: 'Recursion', icon: '🔄' },
-  { id: 'stacks-queues', label: 'Stacks & Queues', icon: '📚' },
-  { id: 'hash-tables', label: 'Hash Tables', icon: '#️⃣' },
+  { id: 'arrays_and_hashing', label: 'Arrays & Hashing', icon: '📊' },
+  { id: 'two_pointers', label: 'Two Pointers', icon: '👆' },
+  { id: 'stack', label: 'Stack', icon: '📚' },
+  { id: 'binary_search', label: 'Binary Search', icon: '🔍' },
+  { id: 'sliding_window', label: 'Sliding Window', icon: '🪟' },
+  { id: 'linked_list', label: 'Linked List', icon: '🔗' },
+  { id: 'trees', label: 'Trees', icon: '🌳' },
+  { id: 'tries', label: 'Tries', icon: '🔤' },
+  { id: 'heap_and_priority_queue', label: 'Heap & Priority Queue', icon: '⬆️' },
+  { id: 'intervals', label: 'Intervals', icon: '📏' },
+  { id: 'greedy', label: 'Greedy', icon: '🤑' },
+  { id: 'back_tracking', label: 'Backtracking', icon: '🔄' },
+  { id: 'graphs', label: 'Graphs', icon: '🕸️' },
+  { id: 'dynamic_programming', label: 'Dynamic Programming', icon: '📈' },
 ] as const;
 
 export const mockQuestions: Record<
