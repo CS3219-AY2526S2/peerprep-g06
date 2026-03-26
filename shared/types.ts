@@ -29,3 +29,12 @@ export enum MatchStatus {
     MATCHED = 'MATCHED',
     TIMED_OUT = 'TIMED_OUT',
 }
+
+export interface MatchFoundPayload {
+    matchId: string;
+    question: Question;
+    peerId: string;
+    difficulty: Difficulty;
+    topic: string;
+    language: string;
+}
