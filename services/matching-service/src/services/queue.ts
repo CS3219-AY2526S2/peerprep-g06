@@ -109,3 +109,24 @@ export async function storeMatch(match: Match): Promise<void> {
 
     await redis.expire(`match:${match.id}`, MATCH_HANDOFF_TTL);
 }
+
+// returns the remaining TTL in seconds for a user's request key
+// returns -2 if key does not exist, -1 if no TTL set
+export async function getRequestTTL(userId: string): Promise<number> {
+    return redis.ttl(`request:${userId}`);
+}
+
+// deletes a user's request key (used by cancel handler)
+export async function deleteUserRequest(userId: string): Promise<void> {
+    await redis.del(`request:${userId}`);
+}
+
+// updates the socketId in a user's request hash without resetting TTL
+export async function updateSocketId(userId: string, socketId: string): Promise<void> {
+    await redis.hSet(`request:${userId}`, { socketId });
+}
+
+// returns the queue key a user is currently in, or null if not in any queue
+export async function getUserQueueKey(userId: string): Promise<string | null> {
+    return redis.get(`queues:${userId}`);
+}
