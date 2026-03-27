@@ -81,6 +81,10 @@ async function persistSnapshot(sessionId: string): Promise<void> {
   );
 }
 
+async function flushDocumentSnapshot(sessionId: string): Promise<void> {
+  await persistSnapshot(sessionId);
+}
+
 function scheduleSnapshotPersist(sessionId: string): void {
   const activeDocument = activeDocuments.get(sessionId);
   if (!activeDocument) {
@@ -152,4 +156,22 @@ export async function applyDocumentUpdate(
     updatedAt,
     format: 'yjs-update-base64',
   };
+}
+
+export async function disposeDocument(sessionId: string, flushBeforeDispose = false): Promise<void> {
+  if (flushBeforeDispose) {
+    await flushDocumentSnapshot(sessionId);
+  }
+
+  const activeDocument = activeDocuments.get(sessionId);
+  if (!activeDocument) {
+    return;
+  }
+
+  if (activeDocument.persistTimer) {
+    clearTimeout(activeDocument.persistTimer);
+  }
+
+  activeDocument.doc.destroy();
+  activeDocuments.delete(sessionId);
 }

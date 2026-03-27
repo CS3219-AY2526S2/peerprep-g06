@@ -82,13 +82,30 @@ export interface SessionDocumentUpdatePayload {
   update: string;
 }
 
+export interface ParticipantStatusPayload {
+  sessionId: string;
+  userId: string;
+  status: 'connected' | 'disconnected' | 'left';
+  reason: 'joined' | 'reconnected' | 'temporarily-disconnected' | 'left' | 'grace-expired';
+  at: string;
+}
+
+export interface SessionEndedPayload {
+  sessionId: string;
+  reason: 'all-participants-left';
+  endedAt: string;
+}
+
 export interface CollaborationSessionSocketServerToClientEvents {
   'session:joined': (payload: SessionJoinedPayload) => void;
   'session:error': (payload: { message: string }) => void;
   'doc:sync': (payload: SessionDocumentSyncPayload) => void;
   'doc:update': (payload: SessionDocumentSyncPayload & { userId: string }) => void;
+  'participant:status': (payload: ParticipantStatusPayload) => void;
+  'session:ended': (payload: SessionEndedPayload) => void;
 }
 
 export interface CollaborationSessionSocketClientToServerEvents {
   'doc:update': (payload: SessionDocumentUpdatePayload) => void;
+  'session:leave': () => void;
 }

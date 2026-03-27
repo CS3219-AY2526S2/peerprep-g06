@@ -5,19 +5,24 @@ import { getSupabaseUser } from '../lib/supabase';
 import {
   CollaborationSessionSocketClientToServerEvents,
   CollaborationSessionSocketServerToClientEvents,
+  ParticipantStatusPayload,
+  SessionEndedPayload,
   SessionDocumentUpdatePayload,
   SessionJoinedPayload,
 } from '../types/contracts';
 import {
   clearGracePeriod,
+  deleteSessionState,
+  getGracePeriod,
   getParticipants,
   getSession,
   getStoredJoinToken,
   hashJoinToken,
+  saveGracePeriod,
   updateParticipantPresence,
   updateSessionStatus,
 } from './sessionPersistence';
-import { applyDocumentUpdate, getDocumentSyncPayload } from './documentSyncService';
+import { applyDocumentUpdate, disposeDocument, getDocumentSyncPayload } from './documentSyncService';
 import { logger } from '../utils/logger';
 
 type SessionNamespace = Namespace<
@@ -26,9 +31,14 @@ type SessionNamespace = Namespace<
 >;
 
 const SESSION_ROOM_PREFIX = 'session:';
+const graceTimeouts = new Map<string, NodeJS.Timeout>();
 
 function getSessionRoom(sessionId: string): string {
   return `${SESSION_ROOM_PREFIX}${sessionId}`;
+}
+
+function getGraceTimeoutKey(sessionId: string, userId: string): string {
+  return `${sessionId}:${userId}`;
 }
 
 function getBearerToken(socket: any): string | null {
@@ -60,6 +70,218 @@ async function disconnectStaleSessionSocket(namespace: SessionNamespace, socketI
   }
 }
 
+function emitParticipantStatus(
+  namespace: SessionNamespace,
+  sessionId: string,
+  payload: ParticipantStatusPayload,
+  excludedSocketId?: string,
+): void {
+  const room = getSessionRoom(sessionId);
+
+  if (excludedSocketId) {
+    namespace.except(excludedSocketId).to(room).emit('participant:status', payload);
+    return;
+  }
+
+  namespace.to(room).emit('participant:status', payload);
+}
+
+function clearScheduledGraceTimeout(sessionId: string, userId: string): void {
+  const timeoutKey = getGraceTimeoutKey(sessionId, userId);
+  const existingTimeout = graceTimeouts.get(timeoutKey);
+
+  if (existingTimeout) {
+    clearTimeout(existingTimeout);
+    graceTimeouts.delete(timeoutKey);
+  }
+}
+
+async function cleanupEndedSession(namespace: SessionNamespace, sessionId: string): Promise<void> {
+  const endedAt = new Date().toISOString();
+  const endedPayload: SessionEndedPayload = {
+    sessionId,
+    reason: 'all-participants-left',
+    endedAt,
+  };
+
+  await updateSessionStatus(sessionId, 'ended');
+  namespace.to(getSessionRoom(sessionId)).emit('session:ended', endedPayload);
+  await disposeDocument(sessionId);
+  await deleteSessionState(sessionId);
+}
+
+async function endSessionIfComplete(namespace: SessionNamespace, sessionId: string): Promise<boolean> {
+  const participants = await getParticipants(sessionId);
+  if (!participants || participants.some((participant) => participant.status !== 'left')) {
+    return false;
+  }
+
+  await cleanupEndedSession(namespace, sessionId);
+  return true;
+}
+
+function scheduleGraceExpiry(
+  namespace: SessionNamespace,
+  sessionId: string,
+  userId: string,
+  gracePeriodMs: number,
+): void {
+  clearScheduledGraceTimeout(sessionId, userId);
+
+  const timeoutKey = getGraceTimeoutKey(sessionId, userId);
+  const timeout = setTimeout(() => {
+    void handleGraceExpiry(namespace, sessionId, userId);
+  }, gracePeriodMs);
+
+  graceTimeouts.set(timeoutKey, timeout);
+}
+
+async function handleGraceExpiry(
+  namespace: SessionNamespace,
+  sessionId: string,
+  userId: string,
+): Promise<void> {
+  clearScheduledGraceTimeout(sessionId, userId);
+
+  const [session, participants, gracePeriod] = await Promise.all([
+    getSession(sessionId),
+    getParticipants(sessionId),
+    getGracePeriod(sessionId, userId),
+  ]);
+
+  if (!session || !participants || !gracePeriod) {
+    return;
+  }
+
+  const participant = participants.find((entry) => entry.userId === userId);
+  if (!participant || participant.status !== 'disconnected') {
+    await clearGracePeriod(sessionId, userId);
+    return;
+  }
+
+  if (gracePeriod.expiresAt > new Date().toISOString()) {
+    scheduleGraceExpiry(
+      namespace,
+      sessionId,
+      userId,
+      new Date(gracePeriod.expiresAt).getTime() - Date.now(),
+    );
+    return;
+  }
+
+  const leftAt = new Date().toISOString();
+  await updateParticipantPresence(sessionId, userId, {
+    status: 'left',
+    socketId: undefined,
+    disconnectedAt: leftAt,
+  });
+  await clearGracePeriod(sessionId, userId);
+
+  emitParticipantStatus(namespace, sessionId, {
+    sessionId,
+    userId,
+    status: 'left',
+    reason: 'grace-expired',
+    at: leftAt,
+  });
+
+  await endSessionIfComplete(namespace, sessionId);
+}
+
+async function handleParticipantLeave(namespace: SessionNamespace, socket: any): Promise<void> {
+  if (socket.data.leaveHandled) {
+    return;
+  }
+
+  socket.data.leaveHandled = true;
+  socket.data.explicitLeave = true;
+
+  const userId = socket.data.userId as string;
+  const sessionId = socket.data.sessionId as string;
+  const leftAt = new Date().toISOString();
+
+  clearScheduledGraceTimeout(sessionId, userId);
+  await clearGracePeriod(sessionId, userId);
+  await updateParticipantPresence(sessionId, userId, {
+    status: 'left',
+    socketId: undefined,
+    disconnectedAt: leftAt,
+  });
+
+  emitParticipantStatus(
+    namespace,
+    sessionId,
+    {
+      sessionId,
+      userId,
+      status: 'left',
+      reason: 'left',
+      at: leftAt,
+    },
+    socket.id,
+  );
+
+  const sessionEnded = await endSessionIfComplete(namespace, sessionId);
+  if (sessionEnded) {
+    socket.emit('session:ended', {
+      sessionId,
+      reason: 'all-participants-left',
+      endedAt: new Date().toISOString(),
+    });
+  }
+
+  socket.disconnect(true);
+}
+
+async function handleUnexpectedDisconnect(
+  namespace: SessionNamespace,
+  socket: any,
+  reason: string,
+): Promise<void> {
+  if (socket.data.explicitLeave) {
+    return;
+  }
+
+  const userId = socket.data.userId as string;
+  const sessionId = socket.data.sessionId as string;
+  const [session, participants] = await Promise.all([getSession(sessionId), getParticipants(sessionId)]);
+
+  if (!session || !participants) {
+    return;
+  }
+
+  const participant = participants.find((entry) => entry.userId === userId);
+  if (!participant || participant.socketId !== socket.id || participant.status === 'left') {
+    return;
+  }
+
+  const disconnectedAt = new Date().toISOString();
+  const graceRecord = {
+    sessionId,
+    userId,
+    createdAt: disconnectedAt,
+    expiresAt: new Date(Date.now() + session.gracePeriodMs).toISOString(),
+  };
+
+  await updateParticipantPresence(sessionId, userId, {
+    status: 'disconnected',
+    socketId: undefined,
+    disconnectedAt,
+  });
+  await saveGracePeriod(graceRecord);
+  scheduleGraceExpiry(namespace, sessionId, userId, session.gracePeriodMs);
+
+  emitParticipantStatus(namespace, sessionId, {
+    sessionId,
+    userId,
+    status: 'disconnected',
+    reason: 'temporarily-disconnected',
+    at: disconnectedAt,
+  });
+
+  logger.info(`Session socket disconnected: ${socket.id}`, reason);
+}
+
 export function configureSessionNamespace(namespace: SessionNamespace): void {
   namespace.use(async (socket, next) => {
     try {
@@ -86,9 +308,17 @@ export function configureSessionNamespace(namespace: SessionNamespace): void {
         return next(new Error('Session not found'));
       }
 
+      if (session.status === 'ended') {
+        return next(new Error('Session has already ended'));
+      }
+
       const participant = participants.find((entry) => entry.userId === user.id);
       if (!participant) {
         return next(new Error('User is not a participant in this session'));
+      }
+
+      if (participant.status === 'left') {
+        return next(new Error('User has already left this session'));
       }
 
       if (
@@ -106,6 +336,7 @@ export function configureSessionNamespace(namespace: SessionNamespace): void {
       await disconnectStaleSessionSocket(namespace, participant.socketId);
 
       const connectedAt = new Date().toISOString();
+      clearScheduledGraceTimeout(sessionId, user.id);
       await updateParticipantPresence(sessionId, user.id, {
         status: 'connected',
         socketId: socket.id,
@@ -116,6 +347,7 @@ export function configureSessionNamespace(namespace: SessionNamespace): void {
 
       socket.data.userId = user.id;
       socket.data.sessionId = sessionId;
+      socket.data.previousStatus = participant.status;
       return next();
     } catch (error) {
       logger.error('Session socket authentication failed', error);
@@ -144,6 +376,18 @@ export function configureSessionNamespace(namespace: SessionNamespace): void {
 
     socket.emit('session:joined', joinedPayload);
     socket.emit('doc:sync', await getDocumentSyncPayload(sessionId));
+    emitParticipantStatus(
+      namespace,
+      sessionId,
+      {
+        sessionId,
+        userId,
+        status: 'connected',
+        reason: socket.data.previousStatus === 'disconnected' ? 'reconnected' : 'joined',
+        at: new Date().toISOString(),
+      },
+      socket.id,
+    );
     logger.info(`Session socket connected: ${socket.id} for user ${userId} in session ${sessionId}`);
 
     socket.on('doc:update', async (payload: SessionDocumentUpdatePayload) => {
@@ -165,8 +409,17 @@ export function configureSessionNamespace(namespace: SessionNamespace): void {
       }
     });
 
+    socket.on('session:leave', async () => {
+      try {
+        await handleParticipantLeave(namespace, socket);
+      } catch (error) {
+        logger.error(`Failed to process session leave for ${sessionId}`, error);
+        socket.emit('session:error', { message: 'Failed to leave session' });
+      }
+    });
+
     socket.on('disconnect', (reason: string) => {
-      logger.info(`Session socket disconnected: ${socket.id}`, reason);
+      void handleUnexpectedDisconnect(namespace, socket, reason);
     });
   });
 }
