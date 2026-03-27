@@ -3,7 +3,7 @@
 import { createHash } from 'crypto';
 import { config } from '../config/env';
 import { redis } from '../config/redis';
-import { QuestionSnapshot } from '../types/contracts';
+import { Question } from '../types/contracts';
 import {
   CollaborationSession,
   GracePeriodRecord,
@@ -135,8 +135,8 @@ export async function updateSessionStatus(
   return updatedSession;
 }
 
-export async function getQuestionSnapshot(sessionId: string): Promise<QuestionSnapshot | null> {
-  return parseJson<QuestionSnapshot>(await redis.get(collabKeys.question(sessionId)));
+export async function getQuestionSnapshot(sessionId: string): Promise<Question | null> {
+  return parseJson<Question>(await redis.get(collabKeys.question(sessionId)));
 }
 
 export async function getParticipants(sessionId: string): Promise<SessionParticipant[] | null> {

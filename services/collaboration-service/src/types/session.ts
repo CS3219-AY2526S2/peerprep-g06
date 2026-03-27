@@ -1,5 +1,5 @@
 // Internal collaboration-service domain models.
-import { JoinTokenClaims, QuestionSnapshot, SessionReadyPayload } from './contracts';
+import { JoinTokenClaims, Question, SessionReadyPayload } from './contracts';
 
 export type ParticipantStatus = 'connected' | 'disconnected' | 'left';
 export type CollaborationSessionStatus = 'pending' | 'active' | 'ended';
@@ -62,7 +62,7 @@ export interface PersistedSessionSeed {
   // All records that are written together when a new collaboration session is created.
   session: CollaborationSession;
   participants: SessionParticipant[];
-  question: QuestionSnapshot;
+  question: Question;
   document: SessionDocumentSnapshot;
   joinTokens: Array<{
     token: string;

@@ -17,11 +17,6 @@ interface JoinTokenRecord {
   claims: JoinTokenClaims;
 }
 
-function getStarterCode(event: MatchFoundEvent): string {
-  // Session creation starts from deterministic starter code for the chosen language.
-  return event.question.starterCodeByLanguage[event.language] ?? '';
-}
-
 function createJoinToken(matchId: string, sessionId: string, userId: string, nowIso: string): JoinTokenRecord {
   // Join tokens are generated here, then their verification record is stored in Redis.
   const token = randomBytes(32).toString('base64url');
@@ -69,7 +64,7 @@ function buildSessionSeed(event: MatchFoundEvent): PersistedSessionSeed {
     document: {
       sessionId,
       language: event.language,
-      content: getStarterCode(event),
+      content: '',
       format: 'plain-text',
       updatedAt: createdAt,
     },

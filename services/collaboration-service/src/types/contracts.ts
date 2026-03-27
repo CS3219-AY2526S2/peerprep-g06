@@ -2,23 +2,12 @@
 // These mirror the cross-service payloads that matching/gateway/frontend are expected to understand.
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
-export interface QuestionImage {
+export interface Question {
   id: string;
-  url: string;
-  alt?: string;
-  width?: number;
-  height?: number;
-}
-
-export interface QuestionSnapshot {
-  questionId: string;
-  version: number;
   title: string;
   description: string;
-  examples: string[];
-  constraints: string[];
-  images: QuestionImage[];
-  starterCodeByLanguage: Record<string, string>;
+  difficulty: string;
+  topic: string;
 }
 
 export interface MatchFoundEvent {
@@ -30,7 +19,7 @@ export interface MatchFoundEvent {
   difficulty: Difficulty;
   topic: string;
   language: string;
-  question: QuestionSnapshot;
+  question: Question;
   matchedAt: string;
 }
 
@@ -49,7 +38,7 @@ export interface SessionReadyPayload {
   joinToken: string;
   gracePeriodMs: number;
   language: string;
-  question: QuestionSnapshot;
+  question: Question;
   websocketUrl: string;
 }
 
