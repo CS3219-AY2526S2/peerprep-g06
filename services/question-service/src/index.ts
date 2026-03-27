@@ -67,6 +67,28 @@ app.get('/questions/random', async (_req, res) => {
   res.json(random)
 })
 
+// GET random question by difficulty, topic
+app.get('/questions/random/:difficulty/:topic', async (req, res) => {
+  const { difficulty, topic } = req.params;
+  const { data, error } = await supabase
+    .from('questions')
+    .select('*')
+    .eq('difficulty', difficulty)
+    .contains('topic', [topic])
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  if (!data || data.length === 0) {
+    return res.status(404).json({ error: 'No questions found' })
+  }
+
+  const random = data[Math.floor(Math.random() * data.length)]
+
+  res.json(random)
+})
+
 // POST question
 app.post('/questions/add', async (req, res) => {
   const { data, error } = await supabase
