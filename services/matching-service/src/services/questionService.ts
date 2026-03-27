@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger';
 import { Question } from '@shared/types';
 
-const QUESTION_SERVICE_URL = process.env.QUESTION_SERVICE_URL || 'http://localhost:3003';
+const QUESTION_SERVICE_URL = process.env.QUESTION_SERVICE_URL || 'http://localhost:3002';
 
 
 export async function getRandomQuestion(
