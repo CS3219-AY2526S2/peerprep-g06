@@ -8,13 +8,13 @@ import {
     getQueueKey,
     setUserMatched,
 } from './queue';
-import { createSessionId } from '../utils/utils';
 import {
     Match,
     MatchStatus
 } from '../types/match';
 import { User } from '../types/user';
 import { logger } from '../utils/logger';
+import { getRandomQuestion } from './questionService';
 import Crypto from 'crypto';
 
 export async function findMatch(user: User): Promise<Match | undefined> {
@@ -89,6 +89,7 @@ export async function lockMatch(user: User, candidate: User): Promise<boolean> {
 }
 
 export async function createMatch(user: User, candidate: User, queueKey: string, commonTopic: string): Promise<Match> {
+    const question = await getRandomQuestion(user.difficulty, commonTopic);
     // both users confirmed PENDING under lock - proceed with match
     await removeUserFromQueue(user.id, queueKey);
     logger.debug(`Removed ${user.id} from queue ${queueKey}`);
@@ -97,7 +98,6 @@ export async function createMatch(user: User, candidate: User, queueKey: string,
 
     const startTime = Date.now();
     const matchId = Crypto.randomUUID();
-    const sessionId = createSessionId(user, candidate, startTime);
 
     // set the users to matched
     await setUserMatched(user.id, matchId);
@@ -105,19 +105,16 @@ export async function createMatch(user: User, candidate: User, queueKey: string,
     await setUserMatched(candidate.id, matchId);
     logger.debug(`Set ${candidate.id} to matched ${matchId}`);
 
-    // todo: fetch question
-
     const match: Match = {
         id: matchId,
         user1Id: user.id,
         user2Id: candidate.id,
         commonTopic,
-        questionId: '',
+        question: question,
         difficulty: user.difficulty,
         commonLanguage: user.language,
         createdAt: new Date(startTime),
         status: MatchStatus.MATCHED,
-        sessionId,
     };
 
     return match;

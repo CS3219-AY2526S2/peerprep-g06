@@ -3,13 +3,13 @@ services:
     build: ./services/matching-service
     container_name: peerprep-matching-service
     ports:
-      - '${MATCHING_SERVICE_PORT:-3002}:${MATCHING_SERVICE_PORT:-3002}'
+      - '${MATCHING_SERVICE_PORT:-3003}:${MATCHING_SERVICE_PORT:-3003}'
     environment:
       - REDIS_USERNAME=${REDIS_USERNAME}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
-      - MATCHING_SERVICE_PORT=${MATCHING_SERVICE_PORT:-3002}
+      - MATCHING_SERVICE_PORT=${MATCHING_SERVICE_PORT:-3003}
       - NODE_ENV=development
       - MATCHING_TIMEOUT=3000
       - LOG_LEVEL=debug
