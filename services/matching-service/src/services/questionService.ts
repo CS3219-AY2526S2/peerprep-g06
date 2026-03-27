@@ -8,10 +8,14 @@ export async function getRandomQuestion(
     difficulty: string,
     topic: string,
 ): Promise<Question> {
+    const url = `${QUESTION_SERVICE_URL}/questions/random/${difficulty}/${topic}`;
+    logger.info(`Fetching random question from: ${url}`);
 
-    const response = await fetch(`${QUESTION_SERVICE_URL}/questions/random/${difficulty}/${topic}`);
+    const response = await fetch(url);
     if (!response.ok) {
-        throw new Error('Failed to get random question');
+        const body = await response.text();
+        logger.error(`Question service returned ${response.status}: ${body}`);
+        throw new Error(`Failed to get random question: ${response.status}`);
     }
     const data = await response.json() as Question;
     return data;

@@ -4,6 +4,7 @@ import Login from '../src/pages/Login';
 import Signup from '../src/pages/Signup';
 import Index from '../src/pages/Index';
 import Match from './pages/Match';
+import Queue from './pages/Queue';
 import Account from './pages/Account';
 import DevPanel from './pages/DevPanel';
 import Questions from './pages/Questions';
@@ -22,6 +23,14 @@ const App = () => {
         element={
           <ProtectedRoute>
             <Match />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/queue"
+        element={
+          <ProtectedRoute>
+            <Queue />
           </ProtectedRoute>
         }
       />
