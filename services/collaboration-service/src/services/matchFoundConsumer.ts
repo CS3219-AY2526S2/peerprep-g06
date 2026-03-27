@@ -8,6 +8,7 @@ import {
   deliverSessionReadyIfConnected,
   queueSessionReadyNotification,
 } from './notificationService';
+import { NotificationTransport } from './realtimeTransport';
 import { logger } from '../utils/logger';
 
 function parseMatchFoundEvent(content: Buffer): MatchFoundEvent {
@@ -28,7 +29,10 @@ function parseMatchFoundEvent(content: Buffer): MatchFoundEvent {
   return parsed;
 }
 
-export async function startMatchFoundConsumer(channel: any, io: any): Promise<void> {
+export async function startMatchFoundConsumer(
+  channel: any,
+  notificationTransport: NotificationTransport,
+): Promise<void> {
   await channel.assertExchange(config.rabbitmq.matchFoundExchange, 'topic', {
     durable: true,
   });
@@ -71,7 +75,11 @@ export async function startMatchFoundConsumer(channel: any, io: any): Promise<vo
 
       // If the user is already online on the notification socket, deliver immediately and clear the pending record.
       for (const payload of sessionReadyPayloads) {
-        await deliverSessionReadyIfConnected(io, payload!.userId, payload!.sessionId);
+        await deliverSessionReadyIfConnected(
+          notificationTransport,
+          payload!.userId,
+          payload!.sessionId,
+        );
       }
 
       logger.info(

@@ -10,6 +10,10 @@ import { connectRabbitMq } from './config/rabbitmq';
 import { connectRedis } from './config/redis';
 import { startMatchFoundConsumer } from './services/matchFoundConsumer';
 import { configureNotificationNamespace } from './services/notificationSocket';
+import {
+  createSocketIoNotificationTransport,
+  createSocketIoSessionTransport,
+} from './services/realtimeTransport';
 import { configureSessionNamespace } from './services/sessionSocket';
 import {
   CollaborationSocketClientToServerEvents,
@@ -40,12 +44,14 @@ app.use(
 );
 app.use(express.json());
 
-configureNotificationNamespace(io);
+const notificationTransport = createSocketIoNotificationTransport(io);
+configureNotificationNamespace(io, notificationTransport);
 const sessionNamespace = io.of('/session') as unknown as import('socket.io').Namespace<
   CollaborationSessionSocketClientToServerEvents,
   CollaborationSessionSocketServerToClientEvents
 >;
-configureSessionNamespace(sessionNamespace);
+const sessionTransport = createSocketIoSessionTransport(sessionNamespace);
+configureSessionNamespace(sessionNamespace, sessionTransport);
 
 app.get('/health', (_req, res) => {
   res.status(200).json({
@@ -59,7 +65,7 @@ async function bootstrap() {
   // Infrastructure dependencies are required before the service can consume match events safely.
   await connectRedis();
   const { channel } = await connectRabbitMq();
-  await startMatchFoundConsumer(channel, io);
+  await startMatchFoundConsumer(channel, notificationTransport);
 
   server.listen(config.port, () => {
     logger.info(`Collaboration service listening on port ${config.port}`);
