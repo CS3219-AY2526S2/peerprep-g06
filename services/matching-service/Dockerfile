@@ -4,12 +4,12 @@ WORKDIR /
 
 # Copy and build the shared rabbitmq module
 COPY shared/rabbitmq /shared/rabbitmq
-RUN cd /shared/rabbitmq && npm install && npm run build
+RUN cd /shared/rabbitmq && rm -rf node_modules && npm install --include=dev && ./node_modules/.bin/tsc
 
 WORKDIR /app
 
-# Copy package files
-COPY services/matching-service/package*.json ./
+# Copy package.json (not lock file — file: paths differ in container)
+COPY services/matching-service/package.json ./
 
 # Install dependencies
 RUN npm install
