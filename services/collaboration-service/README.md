@@ -314,11 +314,10 @@ Purpose:
 Read top to bottom:
 
 1. `Difficulty`
-2. `QuestionImage`
-3. `QuestionSnapshot`
-4. `MatchFoundEvent`
-5. `JoinTokenClaims`
-6. `SessionReadyPayload`
+2. `Question`
+3. `MatchFoundEvent`
+4. `JoinTokenClaims`
+5. `SessionReadyPayload`
 7. notification socket events
 8. `SessionJoinedPayload`
 9. document sync payloads
@@ -420,7 +419,7 @@ Function walkthrough:
 6. `getSession()` reads the session metadata
 7. `saveSession()` overwrites the session metadata
 8. `updateSessionStatus()` reads, mutates, and saves the session status
-9. `getQuestionSnapshot()` reads the immutable question snapshot
+9. `getQuestionSnapshot()` reads the persisted question payload
 10. `getParticipants()` reads the participant list
 11. `saveParticipants()` overwrites the whole participant list
 12. `updateParticipantPresence()` updates one participant by rewriting the array
@@ -448,13 +447,13 @@ Top to bottom:
 
 1. imports crypto helpers, config, contracts, types, and persistence helpers
 2. `JoinTokenRecord` is a temporary helper shape
-3. `getStarterCode()` selects starter code by language from the question snapshot
+3. the session seed no longer derives starter code from the question payload
 4. `createJoinToken()` creates the raw random token and its claims
 5. `buildSessionSeed()` constructs:
    - session metadata
    - two disconnected participants
-   - question snapshot
-   - plain-text starter document
+   - question payload
+   - empty initial document
    - two join-token records
 6. `createSessionFromMatchFound()` is the public orchestration function
 7. it first checks the fast idempotent path
@@ -815,7 +814,6 @@ socket.emit('session:leave')
 
 ### Frontend Notes
 
-- `question.images` contains URLs, not inline image blobs
 - `SessionReadyPayload.websocketUrl` is the URL to connect to
 - `doc:sync` is the full document snapshot
 - `doc:update` is incremental
@@ -840,12 +838,10 @@ Matching-service integration contract:
 4. matching must not generate join tokens
 5. `matchId` must be stable because collaboration uses it for idempotency
 
-Question snapshot rules:
+Question rules:
 
-- use a versioned snapshot
-- include starter code by language
-- include image URLs or asset references
-- do not include raw image binaries in the message
+- use the current shared matching `Question` type exactly
+- do not add images or richer snapshot fields in this flow
 
 ## 9. What The Question-Service Developer Must Do
 
@@ -853,20 +849,16 @@ Question-service needs to provide data in a shape that matching can embed in `Ma
 
 Required question fields:
 
-- `questionId`
-- `version`
+- `id`
 - `title`
 - `description`
-- `examples`
-- `constraints`
-- `images`
-- `starterCodeByLanguage`
+- `difficulty`
+- `topic`
 
-Image rules:
+Question rules:
 
-- serve stable URLs or asset references
-- include metadata such as `alt`, `width`, `height` when possible
-- do not make collaboration-service fetch image data synchronously before session creation
+- keep the payload aligned with the current shared matching-service `Question` type
+- do not add image or starter-code fields in this version
 
 ## 10. What The API Gateway Developer Must Do
 
