@@ -8,14 +8,12 @@ import {
     getQueueKey,
     setUserMatched,
 } from './queue';
-import {
-    Match,
-    MatchStatus
-} from '../types/match';
+import { Match, MatchStatus } from '@shared/types';
 import { User } from '../types/user';
 import { logger } from '../utils/logger';
 import { getRandomQuestion } from './questionService';
 import Crypto from 'crypto';
+import { publishEvent } from '@shared/rabbitmq/publisher';
 
 export async function findMatch(user: User): Promise<Match | undefined> {
     const queueKey = getQueueKey(user.difficulty, user.language);
@@ -116,6 +114,9 @@ export async function createMatch(user: User, candidate: User, queueKey: string,
         createdAt: new Date(startTime),
         status: MatchStatus.MATCHED,
     };
+
+    // publish the match to rabbitMQ
+    await publishEvent('match', 'created', { match });
 
     return match;
 }
