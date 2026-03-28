@@ -29,7 +29,7 @@ export const config = {
   // RabbitMQ delivers match handoff events from matching-service into collaboration-service.
   rabbitmq: {
     url: process.env.RABBITMQ_URL || DEFAULT_RABBITMQ_URL,
-    matchFoundExchange: process.env.RABBITMQ_MATCH_FOUND_EXCHANGE || 'peerprep.matching',
+    matchFoundExchange: process.env.RABBITMQ_MATCH_FOUND_EXCHANGE || 'peerprep',
     matchFoundQueue: process.env.RABBITMQ_MATCH_FOUND_QUEUE || 'collaboration.match-found',
     matchFoundRoutingKey: process.env.RABBITMQ_MATCH_FOUND_ROUTING_KEY || 'match.found',
   },

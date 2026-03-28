@@ -39,25 +39,6 @@ export interface MatchFoundPayload {
   language: string;
 }
 
-export interface QuestionImage {
-  id: string;
-  url: string;
-  alt?: string;
-  width?: number;
-  height?: number;
-}
-
-export interface QuestionSnapshot {
-  questionId: string;
-  version: number;
-  title: string;
-  description: string;
-  examples: string[];
-  constraints: string[];
-  images: QuestionImage[];
-  starterCodeByLanguage: Record<string, string>;
-}
-
 export interface MatchFoundEvent {
   eventVersion: 1;
   matchId: string;
@@ -66,7 +47,7 @@ export interface MatchFoundEvent {
   difficulty: Difficulty;
   topic: string;
   language: string;
-  question: QuestionSnapshot;
+  question: Question;
   matchedAt: string;
 }
 
@@ -76,7 +57,7 @@ export interface SessionReadyPayload {
   joinToken: string;
   gracePeriodMs: number;
   language: string;
-  question: QuestionSnapshot;
+  question: Question;
   websocketUrl: string;
 }
 

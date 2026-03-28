@@ -8,7 +8,7 @@ export async function consume(queue: string) {
 
     console.log(`Waiting for messages on ${queue}...`);
 
-    channel.consume(queue, (msg) => {
+    channel.consume(queue, (msg: any) => {
         if (msg !== null) {
             const message = JSON.parse(msg.content.toString());
             console.log(`Received message: ${message}`);

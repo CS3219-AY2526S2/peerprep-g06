@@ -3,7 +3,7 @@
 import { createHash } from 'crypto';
 import { config } from '../config/env';
 import { redis } from '../config/redis';
-import { QuestionSnapshot } from '../types/contracts';
+import { Question } from '../types/contracts';
 import {
   CollaborationSession,
   GracePeriodRecord,
@@ -135,8 +135,8 @@ export async function updateSessionStatus(
   return updatedSession;
 }
 
-export async function getQuestionSnapshot(sessionId: string): Promise<QuestionSnapshot | null> {
-  return parseJson<QuestionSnapshot>(await redis.get(collabKeys.question(sessionId)));
+export async function getQuestionSnapshot(sessionId: string): Promise<Question | null> {
+  return parseJson<Question>(await redis.get(collabKeys.question(sessionId)));
 }
 
 export async function getParticipants(sessionId: string): Promise<SessionParticipant[] | null> {
@@ -252,4 +252,27 @@ export async function getGracePeriod(
 
 export async function clearGracePeriod(sessionId: string, userId: string): Promise<void> {
   await redis.del(collabKeys.graceTimer(sessionId, userId));
+}
+
+export async function deleteSessionState(sessionId: string): Promise<void> {
+  const [session, participants] = await Promise.all([getSession(sessionId), getParticipants(sessionId)]);
+  if (!session) {
+    return;
+  }
+
+  const transaction = redis.multi();
+  transaction.del(collabKeys.matchSession(session.matchId));
+  transaction.del(collabKeys.session(sessionId));
+  transaction.del(collabKeys.participants(sessionId));
+  transaction.del(collabKeys.question(sessionId));
+  transaction.del(collabKeys.document(sessionId));
+
+  for (const participant of participants ?? []) {
+    transaction.del(collabKeys.joinToken(sessionId, participant.userId));
+    transaction.del(collabKeys.graceTimer(sessionId, participant.userId));
+    transaction.del(collabKeys.pendingDelivery(participant.userId, sessionId));
+    transaction.sRem(collabKeys.pendingDeliveryIndex(participant.userId), sessionId);
+  }
+
+  await transaction.exec();
 }

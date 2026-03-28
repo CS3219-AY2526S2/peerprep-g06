@@ -1,6 +1,5 @@
 // Notification delivery helpers.
 // This service builds session-ready payloads, stores them for replay, and emits them to connected users.
-import { Server } from 'socket.io';
 import { config } from '../config/env';
 import {
   clearPendingDelivery,
@@ -12,13 +11,8 @@ import {
   savePendingDelivery,
 } from './sessionPersistence';
 import { SessionReadyPayload } from '../types/contracts';
+import { NotificationTransport } from './realtimeTransport';
 import { logger } from '../utils/logger';
-
-const USER_ROOM_PREFIX = 'user:';
-
-function getUserRoom(userId: string): string {
-  return `${USER_ROOM_PREFIX}${userId}`;
-}
 
 function buildDeliveryExpiry(): string {
   return new Date(Date.now() + config.joinTokenTtlMs).toISOString();
@@ -59,25 +53,27 @@ export async function queueSessionReadyNotification(payload: SessionReadyPayload
   });
 }
 
-export async function deliverPendingNotifications(io: Server, userId: string): Promise<void> {
+export async function deliverPendingNotifications(
+  transport: NotificationTransport,
+  userId: string,
+): Promise<void> {
   // Replays any notifications that were queued while the user was offline.
   const pendingDeliveries = await listPendingDeliveries(userId);
 
   for (const delivery of pendingDeliveries) {
-    io.to(getUserRoom(userId)).emit('session-ready', delivery.payload);
+    transport.emitSessionReady(userId, delivery.payload);
     await clearPendingDelivery(userId, delivery.sessionId);
     logger.info(`Delivered pending session-ready for user ${userId} and session ${delivery.sessionId}`);
   }
 }
 
 export async function deliverSessionReadyIfConnected(
-  io: Server,
+  transport: NotificationTransport,
   userId: string,
   sessionId: string,
 ): Promise<void> {
   // Fast path for users who are already sitting on the notification socket when the match is processed.
-  const room = io.sockets.adapter.rooms.get(getUserRoom(userId));
-  if (!room || room.size === 0) {
+  if (!transport.isUserConnected(userId)) {
     return;
   }
 
@@ -86,13 +82,7 @@ export async function deliverSessionReadyIfConnected(
     return;
   }
 
-  io.to(getUserRoom(userId)).emit('session-ready', delivery.payload);
+  transport.emitSessionReady(userId, delivery.payload);
   await clearPendingDelivery(userId, sessionId);
   logger.info(`Delivered live session-ready for user ${userId} and session ${sessionId}`);
-}
-
-export function registerNotificationSocket(socket: any, userId: string): void {
-  // Rooms give us a stable per-user delivery target even if the concrete socket id changes.
-  socket.join(getUserRoom(userId));
-  logger.info(`Registered notification socket ${socket.id} for user ${userId}`);
 }

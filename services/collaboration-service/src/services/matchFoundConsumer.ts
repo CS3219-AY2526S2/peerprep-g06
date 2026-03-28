@@ -8,27 +8,42 @@ import {
   deliverSessionReadyIfConnected,
   queueSessionReadyNotification,
 } from './notificationService';
+import { NotificationTransport } from './realtimeTransport';
 import { logger } from '../utils/logger';
 
+interface MatchFoundEnvelope {
+  event: string;
+  data?: {
+    matchFound?: MatchFoundEvent;
+  };
+  timestamp?: number;
+}
+
 function parseMatchFoundEvent(content: Buffer): MatchFoundEvent {
-  // Keep validation small here; deeper domain assumptions stay inside session creation/persistence.
-  const parsed = JSON.parse(content.toString()) as MatchFoundEvent;
+  // Matching publishes an event envelope through the shared RabbitMQ publisher.
+  const parsed = JSON.parse(content.toString()) as MatchFoundEnvelope;
+  const event = parsed.data?.matchFound;
 
   if (
-    parsed.eventVersion !== 1 ||
-    !parsed.matchId ||
-    !parsed.user1Id ||
-    !parsed.user2Id ||
-    !parsed.language ||
-    !parsed.question
+    parsed.event !== 'match' ||
+    !event ||
+    event.eventVersion !== 1 ||
+    !event.matchId ||
+    !event.user1Id ||
+    !event.user2Id ||
+    !event.language ||
+    !event.question
   ) {
     throw new Error('Invalid MatchFound payload');
   }
 
-  return parsed;
+  return event;
 }
 
-export async function startMatchFoundConsumer(channel: any, io: any): Promise<void> {
+export async function startMatchFoundConsumer(
+  channel: any,
+  notificationTransport: NotificationTransport,
+): Promise<void> {
   await channel.assertExchange(config.rabbitmq.matchFoundExchange, 'topic', {
     durable: true,
   });
@@ -71,7 +86,11 @@ export async function startMatchFoundConsumer(channel: any, io: any): Promise<vo
 
       // If the user is already online on the notification socket, deliver immediately and clear the pending record.
       for (const payload of sessionReadyPayloads) {
-        await deliverSessionReadyIfConnected(io, payload!.userId, payload!.sessionId);
+        await deliverSessionReadyIfConnected(
+          notificationTransport,
+          payload!.userId,
+          payload!.sessionId,
+        );
       }
 
       logger.info(

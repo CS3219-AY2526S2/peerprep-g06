@@ -2,23 +2,12 @@
 // These mirror the cross-service payloads that matching/gateway/frontend are expected to understand.
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
-export interface QuestionImage {
+export interface Question {
   id: string;
-  url: string;
-  alt?: string;
-  width?: number;
-  height?: number;
-}
-
-export interface QuestionSnapshot {
-  questionId: string;
-  version: number;
   title: string;
   description: string;
-  examples: string[];
-  constraints: string[];
-  images: QuestionImage[];
-  starterCodeByLanguage: Record<string, string>;
+  difficulty: string;
+  topic: string;
 }
 
 export interface MatchFoundEvent {
@@ -30,7 +19,7 @@ export interface MatchFoundEvent {
   difficulty: Difficulty;
   topic: string;
   language: string;
-  question: QuestionSnapshot;
+  question: Question;
   matchedAt: string;
 }
 
@@ -49,7 +38,7 @@ export interface SessionReadyPayload {
   joinToken: string;
   gracePeriodMs: number;
   language: string;
-  question: QuestionSnapshot;
+  question: Question;
   websocketUrl: string;
 }
 
@@ -70,9 +59,42 @@ export interface SessionJoinedPayload {
   status: 'pending' | 'active' | 'ended';
 }
 
+export interface SessionDocumentSyncPayload {
+  sessionId: string;
+  language: string;
+  update: string;
+  updatedAt: string;
+  format: 'yjs-update-base64';
+}
+
+export interface SessionDocumentUpdatePayload {
+  update: string;
+}
+
+export interface ParticipantStatusPayload {
+  sessionId: string;
+  userId: string;
+  status: 'connected' | 'disconnected' | 'left';
+  reason: 'joined' | 'reconnected' | 'temporarily-disconnected' | 'left' | 'grace-expired';
+  at: string;
+}
+
+export interface SessionEndedPayload {
+  sessionId: string;
+  reason: 'all-participants-left';
+  endedAt: string;
+}
+
 export interface CollaborationSessionSocketServerToClientEvents {
   'session:joined': (payload: SessionJoinedPayload) => void;
   'session:error': (payload: { message: string }) => void;
+  'doc:sync': (payload: SessionDocumentSyncPayload) => void;
+  'doc:update': (payload: SessionDocumentSyncPayload & { userId: string }) => void;
+  'participant:status': (payload: ParticipantStatusPayload) => void;
+  'session:ended': (payload: SessionEndedPayload) => void;
 }
 
-export interface CollaborationSessionSocketClientToServerEvents {}
+export interface CollaborationSessionSocketClientToServerEvents {
+  'doc:update': (payload: SessionDocumentUpdatePayload) => void;
+  'session:leave': () => void;
+}

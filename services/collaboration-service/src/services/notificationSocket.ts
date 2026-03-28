@@ -5,7 +5,8 @@ import {
   CollaborationSocketServerToClientEvents,
 } from '../types/contracts';
 import { getSupabaseUser } from '../lib/supabase';
-import { deliverPendingNotifications, registerNotificationSocket } from './notificationService';
+import { deliverPendingNotifications } from './notificationService';
+import { NotificationTransport } from './realtimeTransport';
 import { logger } from '../utils/logger';
 
 type NotificationServer = Server<
@@ -28,7 +29,10 @@ function getBearerToken(socket: any): string | null {
   return null;
 }
 
-export function configureNotificationNamespace(io: NotificationServer): void {
+export function configureNotificationNamespace(
+  io: NotificationServer,
+  transport: NotificationTransport,
+): void {
   // Every client-facing notification socket is authenticated before it can register for user-targeted events.
   io.use(async (socket, next) => {
     try {
@@ -61,8 +65,8 @@ export function configureNotificationNamespace(io: NotificationServer): void {
         return;
       }
 
-      registerNotificationSocket(socket, authenticatedUserId);
-      await deliverPendingNotifications(io, authenticatedUserId);
+      transport.registerUserSocket(socket, authenticatedUserId);
+      await deliverPendingNotifications(transport, authenticatedUserId);
     });
 
     socket.on('disconnect', (reason: string) => {
