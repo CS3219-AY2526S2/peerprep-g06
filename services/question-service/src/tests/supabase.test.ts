@@ -21,13 +21,13 @@ describe('supabaseClient', () => {
   it('reads credentials from secret files when available', async () => {
     mockReadFileSync
       .mockReturnValueOnce('https://secret-url.supabase.co')
-      .mockReturnValueOnce('secret-service-role-key')
+      .mockReturnValueOnce('secret-service-key')
 
     await import('../lib/supabase')
 
     expect(mockCreateClient).toHaveBeenCalledWith(
       'https://secret-url.supabase.co',
-      'secret-service-role-key'
+      'secret-service-key'
     )
   })
 
@@ -37,13 +37,13 @@ describe('supabaseClient', () => {
     })
 
     vi.stubEnv('SUPABASE_URL', 'https://env-url.supabase.co')
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'env-service-role-key')
+    vi.stubEnv('SUPABASE_SERVICE_KEY', 'env-service-key')
 
     await import('../lib/supabase')
 
     expect(mockCreateClient).toHaveBeenCalledWith(
       'https://env-url.supabase.co',
-      'env-service-role-key'
+      'env-service-key'
     )
   })
 
@@ -53,7 +53,7 @@ describe('supabaseClient', () => {
     })
 
     vi.stubEnv('SUPABASE_URL', '')
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '')
+    vi.stubEnv('SUPABASE_SERVICE_KEY', '')
 
     await expect(import('../lib/supabase')).rejects.toThrow(
       'Missing Supabase credentials'
@@ -63,7 +63,7 @@ describe('supabaseClient', () => {
   it('exports a supabase client instance', async () => {
     mockReadFileSync
       .mockReturnValueOnce('https://secret-url.supabase.co')
-      .mockReturnValueOnce('secret-service-role-key')
+      .mockReturnValueOnce('secret-service-key')
 
     const { supabase } = await import('../lib/supabase')
 
