@@ -19,13 +19,13 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   }
 
   const { data: profile } = await supabase
-    .from('users')
+    .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single()
 
   if (!profile || !ALLOWED_ROLES.includes(profile.role)) {
-    return res.status(403).json({ error: 'Forbidden: insufficient permissions' })
+    return res.status(403).json({ error: 'Insufficient permissions' })
   }
 
   next()
