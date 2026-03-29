@@ -10,6 +10,22 @@ This deployment plan assumes:
 - Supabase remains an external managed dependency
 - Redis remains external or is moved to AWS-managed Redis later
 
+## Current Baseline
+
+The branch currently has:
+
+- local Docker Compose orchestration for backend development
+- service-level `.env.example` files for direct service runs
+- a root `.env.example` for Compose-driven local orchestration
+- CI coverage for the current service set, including `collaboration-service`
+- Docker build validation for the current backend services
+
+The branch does not yet include:
+
+- an `nginx` service or config
+- AWS CD automation
+- a local Redis container
+
 ## Deployable Units
 
 The system is deployed as six independent units:
@@ -90,21 +106,32 @@ Use ECS Service Connect or Cloud Map so `nginx` can reach backend services by st
 
 For local development, `docker-compose.yml` should be treated as a local-only stack and not as production deployment configuration.
 
-The current local backend defaults are:
+The current local backend stack includes:
 
 - `user-service` -> `3001`
 - `question-service` -> `3002`
 - `matching-service` -> `3003`
+- `collaboration-service` -> `3004`
+- `rabbitmq` -> `5672` and `15672`
+
+Redis remains external in the current local setup.
 
 ### Local configuration source
 
-Local Docker Compose configuration is sourced from the root `.env` file. The tracked `.env.example` documents the expected local variables for:
+Local configuration follows this split:
+
+- root `.env` for Docker Compose orchestration
+- per-service `.env` files for direct `npm run dev` execution
+- `frontend/.env.local` for frontend development
+
+The tracked root `.env.example` documents the expected local Compose variables for:
 
 - Supabase URLs and service keys
 - Redis connectivity
+- RabbitMQ connectivity
 - local host port mappings
 
-Per-service `.env.example` files are still useful as service-level configuration documentation, but the Compose stack itself is driven from the root `.env`.
+Per-service `.env.example` files document the runtime contract for each individual service.
 
 ## Frontend Deployment
 
@@ -234,12 +261,24 @@ Frontend public variables should be provided at build time and must not include 
 
 ### CI
 
-On every pull request and push:
+The repo currently has CI for:
 
-1. build the frontend
-2. build each backend service
-3. build the `nginx` gateway image
-4. run lint, typecheck, and tests when those scripts exist
+- formatting checks
+- package typecheck/build checks for:
+  - `frontend`
+  - `user-service`
+  - `question-service`
+  - `matching-service`
+  - `collaboration-service`
+  - `shared/rabbitmq`
+- `question-service` test and coverage execution
+- Docker build validation for:
+  - `user-service`
+  - `question-service`
+  - `matching-service`
+  - `collaboration-service`
+
+Target CI after `nginx` is added should also validate the gateway image.
 
 Suggested package-level CI checks:
 
@@ -248,6 +287,7 @@ Suggested package-level CI checks:
 - `question-service`: `npm ci && npm run build`
 - `matching-service`: `npm ci && npm run build`
 - `collaboration-service`: `npm ci && npm run build`
+- `shared/rabbitmq`: `npm ci && npm run build`
 
 ### CD
 
