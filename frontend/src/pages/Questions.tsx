@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { QUESTION_ENDPOINTS } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 interface Question {
   id: string;
@@ -51,6 +52,8 @@ const Questions = () => {
   const [form, setForm] = useState(emptyForm);
   const [formLoading, setFormLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.role !== 'admin' && user?.role !== 'developer') {
@@ -107,74 +110,74 @@ const Questions = () => {
 
   const addQuestion = async () => {
     try {
-        setFormLoading(true);
-        setError(null);
+      setFormLoading(true);
+      setError(null);
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-        const response = await fetch(QUESTION_ENDPOINTS.addQuestion, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({
-            title: form.title,
-            description: form.description,
-            difficulty: form.difficulty,
-            topic: form.topic,
-          }),
-        });
-        closeModal();
-        fetchQuestions();
+      const response = await fetch(QUESTION_ENDPOINTS.addQuestion, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          difficulty: form.difficulty,
+          topic: form.topic,
+        }),
+      });
+      closeModal();
+      fetchQuestions();
 
-        const responseBody = await response.json()
-        if (!response.ok) {
-          throw new Error(responseBody.error || 'Failed to add question')
-        }
-
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setFormLoading(false);
+      const responseBody = await response.json();
+      if (!response.ok) {
+        throw new Error(responseBody.error || 'Failed to add question');
       }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   const editQuestion = async (questionId: string) => {
     try {
-        setFormLoading(true);
-        setError(null);
-        
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+      setFormLoading(true);
+      setError(null);
 
-        const response = await fetch(QUESTION_ENDPOINTS.updateQuestion(questionId), {
-          method: 'PUT',
-          headers: { 
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({
-            title: form.title,
-            description: form.description,
-            difficulty: form.difficulty,
-            topic: form.topic,
-          }),
-        });
-        closeModal();
-        fetchQuestions();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-        const responseBody = await response.json()
-        if (!response.ok) {
-          throw new Error(responseBody.error || 'Failed to edit question')
-        }
+      const response = await fetch(QUESTION_ENDPOINTS.updateQuestion(questionId), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          difficulty: form.difficulty,
+          topic: form.topic,
+        }),
+      });
+      closeModal();
+      fetchQuestions();
 
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setFormLoading(false);
+      const responseBody = await response.json();
+      if (!response.ok) {
+        throw new Error(responseBody.error || 'Failed to edit question');
       }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   const handleDelete = async (questionId: string) => {
@@ -183,20 +186,19 @@ const Questions = () => {
       setError(null);
 
       const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        data: { session },
+      } = await supabase.auth.getSession();
 
       const response = await fetch(QUESTION_ENDPOINTS.deleteQuestion(questionId), {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${session?.access_token}` }
+        headers: { Authorization: `Bearer ${session?.access_token}` },
       });
       fetchQuestions();
 
-      const responseBody = await response.json()
-        if (!response.ok) {
-          throw new Error(responseBody.error || 'Failed to delete question')
-        }
-
+      const responseBody = await response.json();
+      if (!response.ok) {
+        throw new Error(responseBody.error || 'Failed to delete question');
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -283,7 +285,7 @@ const Questions = () => {
                           key={t}
                           className={cn(
                             'text-xs px-2 py-0.5 rounded-full capitalize border shrink-0',
-                            topicColors[t]
+                            topicColors[t],
                           )}
                         >
                           {t.replace(/_/g, ' ')}
@@ -299,7 +301,10 @@ const Questions = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(question.id)}
+                      onClick={() => {
+                        setPendingDeleteId(question.id);
+                        setShowDeleteModal(true);
+                      }}
                       disabled={deleteLoading === question.id}
                       className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     >
@@ -317,7 +322,7 @@ const Questions = () => {
         </div>
       </main>
 
-      {/* Modal */}
+      {/* Add/Edit Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
@@ -381,7 +386,12 @@ const Questions = () => {
                   <select
                     value={form.topic}
                     multiple={false} // #Todo: allow multiple topics (with better ui)
-                    onChange={(e) => setForm({ ...form, topic: Array.from(e.target.selectedOptions, option => option.value) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        topic: Array.from(e.target.selectedOptions, (option) => option.value),
+                      })
+                    }
                     className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:border-primary transition-colors"
                   >
                     <option value="">Select a topic</option>
@@ -422,6 +432,24 @@ const Questions = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirm Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        title="Delete question?"
+        description="This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (pendingDeleteId) handleDelete(pendingDeleteId);
+          setShowDeleteModal(false);
+          setPendingDeleteId(null);
+        }}
+        onCancel={() => {
+          setShowDeleteModal(false);
+          setPendingDeleteId(null);
+        }}
+      />
     </div>
   );
 };

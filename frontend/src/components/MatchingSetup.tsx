@@ -7,6 +7,7 @@ import { Code2, LogOut, CheckCircle2, Shield, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { DIFFICULTIES } from '../../../shared/constants';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 export const MatchingSetup = () => {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ export const MatchingSetup = () => {
   const [localDifficulty, setLocalDifficulty] = useState<Difficulty | null>(selectedDifficulty);
   const [localTopic, setLocalTopic] = useState<string | null>(selectedTopic);
   const [localLanguage, setLocalLanguage] = useState<string | null>(selectedLanguage);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleLogout = async () => {
     await signOut(); // ← sign out from Supabase
@@ -84,7 +86,7 @@ export const MatchingSetup = () => {
             >
               Welcome, <span className="text-foreground font-medium">{user?.name}</span>
             </span>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <Button variant="ghost" size="sm" onClick={() => setShowLogoutModal(true)}>
               <LogOut className="h-4 w-4 mr-2" />
               Log out
             </Button>
@@ -194,6 +196,15 @@ export const MatchingSetup = () => {
           )}
         </div>
       </main>
+      <ConfirmModal
+        isOpen={showLogoutModal}
+        title="Log out?"
+        description="You'll need to sign in again to access your account."
+        confirmLabel="Log out"
+        variant="danger"
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutModal(false)}
+      />
     </div>
   );
 };
