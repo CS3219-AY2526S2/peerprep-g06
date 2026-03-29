@@ -40,15 +40,33 @@ jobs:
           - name: frontend
             path: frontend
             lockfile: frontend/package-lock.json
+            run_tests: false
+            run_coverage: false
           - name: user-service
             path: services/user-service
             lockfile: services/user-service/package-lock.json
+            run_tests: false
+            run_coverage: false
           - name: question-service
             path: services/question-service
             lockfile: services/question-service/package-lock.json
+            run_tests: true
+            run_coverage: true
           - name: matching-service
             path: services/matching-service
             lockfile: services/matching-service/package-lock.json
+            run_tests: false
+            run_coverage: false
+          - name: collaboration-service
+            path: services/collaboration-service
+            lockfile: services/collaboration-service/package-lock.json
+            run_tests: false
+            run_coverage: false
+          - name: shared-rabbitmq
+            path: shared/rabbitmq
+            lockfile: shared/rabbitmq/package-lock.json
+            run_tests: false
+            run_coverage: false
 
     steps:
       - name: Check out repository
@@ -69,6 +87,16 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run typecheck
 
+      - name: Run tests
+        if: matrix.run_tests && !matrix.run_coverage
+        working-directory: ${{ matrix.path }}
+        run: npm test
+
+      - name: Run tests with coverage
+        if: matrix.run_coverage
+        working-directory: ${{ matrix.path }}
+        run: npm run test:coverage
+
       - name: Build package
         working-directory: ${{ matrix.path }}
         run: npm run build
@@ -85,7 +113,10 @@ jobs:
           - name: question-service
             context: services/question-service
           - name: matching-service
-            context: services/matching-service
+            context: .
+            dockerfile: services/matching-service/Dockerfile
+          - name: collaboration-service
+            context: services/collaboration-service
 
     steps:
       - name: Check out repository
@@ -98,5 +129,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile || format('{0}/Dockerfile', matrix.context) }}
           push: false
           tags: local/${{ matrix.name }}:${{ github.sha }}
