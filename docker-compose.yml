@@ -36,7 +36,9 @@ services:
     command: npm run dev
 
   matching-service:
-    build: ./services/matching-service
+    build:
+      context: .
+      dockerfile: services/matching-service/Dockerfile
     container_name: peerprep-matching-service
     ports:
       - "${MATCHING_SERVICE_PORT:-3003}:3003"
@@ -46,15 +48,49 @@ services:
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - MATCHING_SERVICE_PORT=3003
+      - MATCHING_SERVICE_PORT=3003
       - NODE_ENV=development
       - MATCHING_TIMEOUT=3000
       - LOG_LEVEL=debug
+      - RABBITMQ_URL=amqp://user:root@rabbitmq:5672
     volumes:
       - ./services/matching-service:/app
+      - ./shared:/shared
       - /app/node_modules
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks:
       - peerprep-network
     command: npm run dev
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: root
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - peerprep-network
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - "-q"
+        - ping
+      retries: 3
+      timeout: 5s
+      interval: 30s
+
+volumes:
+  rabbitmq_data:
+    driver: local
 
 networks:
   peerprep-network:

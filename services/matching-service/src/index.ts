@@ -6,6 +6,8 @@ import cors from 'cors';
 import { logger } from './utils/logger';
 import { connectRedis, setupRedisSubscription } from './config/redis';
 import { setupSessionManager } from './services/sessionManager';
+import { setupTopicExchange } from '@shared/rabbitmq';
+import { registerHandlers, startMatchmakingInterval } from './handlers/matchingHandler';
 
 // load environment variables
 dotenv.config();
@@ -32,11 +34,7 @@ app.get('/health', (req, res) => {
 // socket.io connection handler
 io.on('connection', (socket) => {
     logger.info(`User connected: ${socket.id}`);
-});
-
-// socket.io disconnection handler
-io.on('disconnect', (socket) => {
-    logger.info(`User disconnected: ${socket.id}`);
+    registerHandlers(io, socket);
 });
 
 
@@ -47,6 +45,8 @@ async function startServer() {
         await connectRedis();
         await setupRedisSubscription();
         await setupSessionManager(io);
+        await setupTopicExchange();
+        startMatchmakingInterval(io);
         logger.info('Redis subscription setup complete');
         server.listen(PORT, () => {
             logger.info(`Matching service listening on port ${PORT}`);
