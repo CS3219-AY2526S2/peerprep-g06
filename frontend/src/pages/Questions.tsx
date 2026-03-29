@@ -5,6 +5,7 @@ import { Code2, ArrowLeft, Plus, Pencil, Trash2, Loader2, X } from 'lucide-react
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { QUESTION_ENDPOINTS } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 interface Question {
   id: string;
@@ -108,9 +109,16 @@ const Questions = () => {
     try {
         setFormLoading(true);
         setError(null);
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
         const response = await fetch(QUESTION_ENDPOINTS.addQuestion, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({
             title: form.title,
             description: form.description,
@@ -120,6 +128,12 @@ const Questions = () => {
         });
         closeModal();
         fetchQuestions();
+
+        const responseBody = await response.json()
+        if (!response.ok) {
+          throw new Error(responseBody.error || 'Failed to add question')
+        }
+
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -131,9 +145,16 @@ const Questions = () => {
     try {
         setFormLoading(true);
         setError(null);
+        
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
         const response = await fetch(QUESTION_ENDPOINTS.updateQuestion(questionId), {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({
             title: form.title,
             description: form.description,
@@ -143,6 +164,12 @@ const Questions = () => {
         });
         closeModal();
         fetchQuestions();
+
+        const responseBody = await response.json()
+        if (!response.ok) {
+          throw new Error(responseBody.error || 'Failed to edit question')
+        }
+
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -154,10 +181,22 @@ const Questions = () => {
     try {
       setDeleteLoading(questionId);
       setError(null);
+
+      const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
       const response = await fetch(QUESTION_ENDPOINTS.deleteQuestion(questionId), {
         method: 'DELETE',
+        headers: { Authorization: `Bearer ${session?.access_token}` }
       });
       fetchQuestions();
+
+      const responseBody = await response.json()
+        if (!response.ok) {
+          throw new Error(responseBody.error || 'Failed to delete question')
+        }
+
     } catch (err: any) {
       setError(err.message);
     } finally {

@@ -1,152 +1,18 @@
 import express from 'express'
 import cors from 'cors'
-import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
-import fs from 'fs'
-
-function readSecret(path: string, fallback?: string) {
-  try {
-    return fs.readFileSync(path, 'utf8').trim()
-  } catch {
-    return fallback
-  }
-}
-
-dotenv.config() 
+import questionRoutes from './routes/questionRoutes'
 
 const app = express()
 app.use(cors())
 app.use(express.json())
 
-const SUPABASE_URL =
-  readSecret('/run/secrets/supabase_url', process.env.SUPABASE_URL)
-
-const SUPABASE_SERVICE_ROLE_KEY =
-  readSecret('/run/secrets/supabase_service_role_key', process.env.SUPABASE_SERVICE_ROLE_KEY)
-
-// Supabase client
-const supabase = createClient(
-  SUPABASE_URL!,
-  SUPABASE_SERVICE_ROLE_KEY!
-)
-
-// Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
 
-// GET all questions
-app.get('/questions', async (_req, res) => {
-  const { data, error } = await supabase
-    .from('questions')
-    .select('*')
-
-  if (error) {
-    return res.status(500).json({ error: error.message })
-  }
-
-  res.json(data)
-})
-
-// GET random question
-app.get('/questions/random', async (_req, res) => {
-  const { data, error } = await supabase
-    .from('questions')
-    .select('*')
-
-  if (error) {
-    return res.status(500).json({ error: error.message })
-  }
-
-  if (!data || data.length === 0) {
-    return res.status(404).json({ error: 'No questions found' })
-  }
-
-  const random = data[Math.floor(Math.random() * data.length)]
-
-  res.json(random)
-})
-
-// GET random question by difficulty, topic
-app.get('/questions/random/:difficulty/:topic', async (req, res) => {
-  const { difficulty, topic } = req.params;
-  const { data, error } = await supabase
-    .from('questions')
-    .select('*')
-    .eq('difficulty', difficulty)
-    .contains('topic', [topic])
-
-  if (error) {
-    return res.status(500).json({ error: error.message })
-  }
-
-  if (!data || data.length === 0) {
-    return res.status(404).json({ error: 'No questions found' })
-  }
-
-  const random = data[Math.floor(Math.random() * data.length)]
-
-  res.json(random)
-})
-
-// POST question
-app.post('/questions/add', async (req, res) => {
-  const { data, error } = await supabase
-    .from('questions')
-    .insert(req.body)
-    .select()
-
-  if (error) {
-    return res.status(500).json({ error: error.message })
-  }
-
-  res.json(data)
-})
-
-// PUT update question
-app.put('/questions/:id/update', async (req, res) => {
-  const { id } = req.params
-
-  const { data, error } = await supabase
-    .from('questions')
-    .update(req.body)
-    .eq('id', id)
-    .select()
-
-  if (error) {
-    return res.status(500).json({ error: error.message })
-  }
-
-  if (!data || data.length === 0) {
-    return res.status(404).json({ error: 'Question not found' })
-  }
-
-  res.json(data)
-})
-
-// DELETE question
-app.delete('/questions/:id/delete', async (req, res) => {
-  const { id } = req.params
-
-  const { data, error } = await supabase
-    .from('questions')
-    .delete()
-    .eq('id', id)
-    .select()
-
-  if (error) {
-    return res.status(500).json({ error: error.message })
-  }
-
-  if (!data || data.length === 0) {
-    return res.status(404).json({ error: 'Question not found' })
-  }
-
-  res.json(data)
-})
+app.use('/questions', questionRoutes)
 
 const PORT = process.env.PORT || 3002
-
 app.listen(PORT, () => {
   console.log(`Question service running on port ${PORT}`)
 })
