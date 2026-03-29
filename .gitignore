@@ -5,3 +5,7 @@ node_modules
 .DS_Store
 dist
 .next
+
+# Test coverage
+coverage/
+*.lcov
