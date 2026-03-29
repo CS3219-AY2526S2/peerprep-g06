@@ -1,382 +1,250 @@
 # PeerPrep Deployment Plan
 
-## Scope and Assumptions
+## Overview
 
-This deployment plan assumes:
+This document captures two things:
 
-- the frontend is fully implemented and production-ready
-- the backend services are fully implemented and production-ready
-- `nginx` is used as the API gateway
-- Supabase remains an external managed dependency
-- Redis remains external or is moved to AWS-managed Redis later
+- the deployment shape we are aiming for
+- the repo state we already have in place before the Nginx work starts
 
-## Current Baseline
+The target production setup is:
 
-The branch currently has:
+- frontend hosted as a static app on `S3 + CloudFront`
+- backend services deployed independently on `ECS Fargate`
+- `nginx` used as the public API gateway
+- Supabase kept as an external managed dependency
+- Redis kept external for now, with the option to move to AWS-managed Redis later
 
-- local Docker Compose orchestration for backend development
-- service-level `.env.example` files for direct service runs
-- a root `.env.example` for Compose-driven local orchestration
-- CI coverage for the current service set, including `collaboration-service`
-- Docker build validation for the current backend services
+We are deliberately not using Kubernetes at this stage. The service count does not justify the extra platform overhead yet.
 
-The branch does not yet include:
+## Where the Repo Stands Today
 
-- an `nginx` service or config
-- AWS CD automation
-- a local Redis container
+The repo already has a usable pre-gateway baseline.
 
-## Deployable Units
+Local development currently supports:
 
-The system is deployed as six independent units:
+- `user-service`
+- `question-service`
+- `matching-service`
+- `collaboration-service`
+- `rabbitmq`
 
-1. `frontend`
-2. `nginx` API gateway
-3. `user-service`
-4. `question-service`
-5. `matching-service`
-6. `collaboration-service`
+`docker-compose.yml` is now a local-only orchestration file. It is not meant to mirror production literally.
 
-Each backend service and the gateway should have its own image, runtime config, logs, and deployment lifecycle.
+Current local defaults are:
 
-## Target Architecture
+- `user-service` on `3001`
+- `question-service` on `3002`
+- `matching-service` on `3003`
+- `collaboration-service` on `3004`
+- RabbitMQ on `5672` with the management UI on `15672`
 
-### Public entrypoints
+Redis is still treated as an external dependency in local development. `matching-service` and `collaboration-service` both connect to the same Redis instance through environment variables.
+
+The local env model is:
+
+- root `.env` for `docker compose`
+- per-service `.env` files for direct `npm run dev`
+- `frontend/.env.local` for frontend development
+
+CI is already in place and now covers the current backend shape. It runs formatting checks, typecheck/build validation across packages, question-service tests with coverage, and Docker image builds for the containerized backend services.
+
+What is not in the repo yet:
+
+- `nginx` config and container
+- AWS CD workflow
+- local Redis container
+
+## Target Production Architecture
+
+The intended production layout is straightforward.
+
+Public entrypoints:
 
 - `app.peerprep.com` -> `CloudFront` -> `S3`
-- `api.peerprep.com` -> `Application Load Balancer` -> `nginx`
+- `api.peerprep.com` -> `ALB` -> `nginx`
 
-### Internal flow
+Internal backend flow:
 
-- frontend assets are served from S3 through CloudFront
-- API traffic enters through the ALB
-- the ALB forwards API traffic to the `nginx` ECS service
-- `nginx` proxies traffic to private ECS services
+- `nginx` receives public API traffic
+- `nginx` proxies to private backend services running on ECS
+- backend services are not directly exposed to the internet
 
-### Backend routing
+The backend services are:
 
-`nginx` should route by path:
+1. `user-service`
+2. `question-service`
+3. `matching-service`
+4. `collaboration-service`
+
+`nginx` is a separate deployable unit and should not be bundled into any application service.
+
+Expected routing through `nginx`:
 
 - `/api/users/*` -> `user-service`
 - `/api/questions/*` -> `question-service`
-- `/api/match/*` and matching websocket endpoints -> `matching-service`
-- `/api/collab/*` and collaboration websocket endpoints -> `collaboration-service`
+- matching API and websocket traffic -> `matching-service`
+- collaboration API and websocket traffic -> `collaboration-service`
 
-The frontend should only talk to one backend base URL:
+The frontend should talk to one backend base URL only.
 
-- `https://api.peerprep.com`
+## Why This Shape
 
-## AWS Services
+This gives us:
 
-Use the following AWS components:
+- one public backend boundary
+- independently deployable backend services
+- a frontend that stays cheap and simple to host
+- a deployment model that fits the current repo better than Kubernetes
 
-- `Amazon S3` for frontend static asset hosting
-- `Amazon CloudFront` for frontend CDN delivery
-- `Amazon Route 53` for DNS
-- `AWS Certificate Manager (ACM)` for TLS certificates
-- `Amazon ECS Fargate` for containerized backend and gateway services
-- `Amazon ECR` for container image storage
-- `AWS Secrets Manager` for secrets and runtime credentials
-- `Amazon CloudWatch` for logs, metrics, and alarms
-- `Application Load Balancer` for public API ingress
+It also lets us introduce `nginx` locally first, validate the routing and websocket behavior, and only then wire the same shape into AWS.
 
-## Networking
+## Realtime and Messaging Constraints
 
-### VPC layout
+Two services are realtime-sensitive:
 
-Create one VPC with:
+- `matching-service`
+- `collaboration-service`
 
-- public subnets for the ALB
-- private subnets for all ECS services
+Both use Socket.IO. That matters for deployment.
 
-### Security boundaries
+Right now, both services are safest as single-instance deployments unless we add cross-instance socket coordination. They use Redis for state, but there is no Socket.IO adapter in the repo yet for multi-instance room/event coordination.
 
-- ALB accepts inbound `80` and `443` from the internet
-- `nginx` accepts traffic only from the ALB
-- backend services accept traffic only from `nginx`
-- backend services are not directly exposed to the internet
+There is also a backend event handoff:
 
-### Service discovery
+- `matching-service` publishes match events
+- `collaboration-service` consumes them through RabbitMQ
 
-Use ECS Service Connect or Cloud Map so `nginx` can reach backend services by stable internal names.
+That means production needs three classes of infrastructure around the app:
 
-## Local Development
+- HTTP/WebSocket ingress
+- Redis
+- RabbitMQ
 
-### Local orchestration
+`nginx` is only responsible for routing traffic. It does not replace RabbitMQ, and it does not solve multi-instance Socket.IO coordination by itself.
 
-For local development, `docker-compose.yml` should be treated as a local-only stack and not as production deployment configuration.
+## Environment Strategy
 
-The current local backend stack includes:
+We should keep a clean split between local orchestration and service-specific runtime configuration.
 
-- `user-service` -> `3001`
-- `question-service` -> `3002`
-- `matching-service` -> `3003`
-- `collaboration-service` -> `3004`
-- `rabbitmq` -> `5672` and `15672`
+For local development:
 
-Redis remains external in the current local setup.
+- root `.env` powers Compose
+- service `.env` files are for running a service directly
+- frontend uses `frontend/.env.local`
 
-### Local configuration source
+For production:
 
-Local configuration follows this split:
+- no checked-in `.env` files
+- runtime secrets come from AWS Secrets Manager
+- frontend public config is injected at build time
 
-- root `.env` for Docker Compose orchestration
-- per-service `.env` files for direct `npm run dev` execution
-- `frontend/.env.local` for frontend development
+Backend secrets include things like:
 
-The tracked root `.env.example` documents the expected local Compose variables for:
-
-- Supabase URLs and service keys
-- Redis connectivity
-- RabbitMQ connectivity
-- local host port mappings
-
-Per-service `.env.example` files document the runtime contract for each individual service.
-
-## Frontend Deployment
-
-### Hosting model
-
-The frontend is a static SPA built with Vite and deployed to:
-
-- `S3` for artifact storage
-- `CloudFront` for public delivery
-
-### Build and publish flow
-
-1. run `npm ci` in `frontend/`
-2. run `npm run build`
-3. upload `frontend/dist` to the S3 bucket
-4. invalidate CloudFront cache
-
-### SPA routing requirement
-
-CloudFront and S3 must be configured so unknown paths return `index.html`, otherwise direct refreshes on client-side routes such as `/login` or `/match` will fail.
-
-## Backend Deployment
-
-### ECS services
-
-Deploy each backend component as its own ECS Fargate service:
-
-1. `nginx`
-2. `user-service`
-3. `question-service`
-4. `matching-service`
-5. `collaboration-service`
-
-Each service should have:
-
-- its own task definition
-- its own CPU and memory configuration
-- its own health check path
-- its own log group
-- its own scaling settings
-
-### Initial scaling recommendation
-
-- `nginx`: 2 tasks across availability zones if possible
-- `user-service`: 1-2 tasks
-- `question-service`: 1-2 tasks
-- `matching-service`: start with 1 task
-- `collaboration-service`: start with 1 task unless multi-instance coordination is already solved
-
-### Real-time service caution
-
-Both `matching-service` and `collaboration-service` may use WebSockets or other real-time connections.
-
-Before scaling either horizontally, confirm:
-
-- event delivery is safe across multiple instances
-- shared state coordination exists where needed
-- websocket upgrade handling is correct through ALB and `nginx`
-- idle and proxy timeouts are aligned
-
-If multi-instance socket coordination is not implemented, keep these services at a single task initially.
-
-## API Gateway Design
-
-### Why `nginx`
-
-`nginx` acts as a centralized API boundary for:
-
-- path routing
-- request logging
-- header management
-- websocket forwarding
-- rate limiting if added later
-- keeping backend services private
-
-### Deployment model
-
-`nginx` should run as its own ECS service, not bundled into another backend service.
-
-### Responsibilities
-
-`nginx` should remain a thin gateway. Business logic and authorization decisions should still be enforced inside the backend services.
-
-## Container and Image Strategy
-
-Create one ECR repository per deployable backend unit:
-
-1. `peerprep-nginx`
-2. `peerprep-user-service`
-3. `peerprep-question-service`
-4. `peerprep-matching-service`
-5. `peerprep-collaboration-service`
-
-Images should be tagged with:
-
-- git commit SHA
-- optionally a semantic version tag later
-
-Use immutable image tags for deployments so rollbacks are predictable.
-
-## Secrets and Configuration
-
-Do not deploy `.env` files to AWS.
-
-Store runtime secrets in AWS Secrets Manager.
-
-### Expected secret categories
-
-- Supabase service credentials
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_KEY`
 - Redis credentials
-- service-specific runtime config
-- any API keys used by collaboration or real-time components
+- RabbitMQ connection details
 
-### Suggested secret grouping
+Frontend build-time variables include public values only, such as:
 
-- `/peerprep/prod/user-service`
-- `/peerprep/prod/question-service`
-- `/peerprep/prod/matching-service`
-- `/peerprep/prod/collaboration-service`
-- `/peerprep/prod/nginx`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- public backend base URLs
 
-Inject these into ECS task definitions at runtime.
+## Local Development Model
 
-Frontend public variables should be provided at build time and must not include backend-only secrets.
+There are two intended ways to work locally.
 
-## CI/CD Plan
+For integrated backend development:
 
-### CI
+- use `docker compose up`
 
-The repo currently has CI for:
+This starts the backend services in containers and includes RabbitMQ. Redis is still expected to exist externally.
 
-- formatting checks
-- package typecheck/build checks for:
+For targeted work on a single service:
+
+- use `npm run dev` inside that service directory
+
+In that mode, the service should read from its own local `.env` file.
+
+For frontend work:
+
+- use `npm run dev` in `frontend/`
+
+This split is intentional. Dockerfiles exist to support Compose, CI image validation, and future AWS deployment. They are not mandatory for every local development flow.
+
+## CI and CD
+
+CI is already partially in place.
+
+Today it validates:
+
+- formatting at the repo root
+- typecheck and build for:
   - `frontend`
   - `user-service`
   - `question-service`
   - `matching-service`
   - `collaboration-service`
   - `shared/rabbitmq`
-- `question-service` test and coverage execution
-- Docker build validation for:
+- `question-service` tests and coverage
+- Docker builds for:
   - `user-service`
   - `question-service`
   - `matching-service`
   - `collaboration-service`
 
-Target CI after `nginx` is added should also validate the gateway image.
+CD is still intentionally paused until the AWS side is ready.
 
-Suggested package-level CI checks:
+The expected CD shape later is:
 
-- `frontend`: `npm ci && npm run build`
-- `user-service`: `npm ci && npm run build`
-- `question-service`: `npm ci && npm run build`
-- `matching-service`: `npm ci && npm run build`
-- `collaboration-service`: `npm ci && npm run build`
-- `shared/rabbitmq`: `npm ci && npm run build`
+- build backend images
+- push them to ECR
+- update ECS services
+- build the frontend
+- publish frontend assets to S3
+- invalidate CloudFront
 
-### CD
+## AWS Plan
 
-On merge to `main`:
+The intended AWS components are:
 
-1. build backend and gateway images
-2. tag images with commit SHA
-3. push images to ECR
-4. update ECS services to the new image versions
-5. build the frontend
-6. upload the frontend build to S3
-7. invalidate CloudFront
+- `ECR` for images
+- `ECS Fargate` for backend services and `nginx`
+- `ALB` for public API ingress
+- `S3 + CloudFront` for the frontend
+- `Route 53` for DNS
+- `ACM` for certificates
+- `Secrets Manager` for backend secrets
+- `CloudWatch` for logs and alarms
 
-### Rollback strategy
+The networking model should be:
 
-- rollback backend by redeploying the previous ECR image tag
-- rollback frontend by restoring the previous S3 artifact set and invalidating CloudFront
+- ALB in public subnets
+- `nginx` and backend services in private subnets
+- backend services reachable only from `nginx`
 
-## Operational Requirements
+## Rollout Order
 
-### Logging
+The remaining work should happen in this order:
 
-Send ECS container logs to CloudWatch for:
+1. branch for `nginx`
+2. add local `nginx` config
+3. add the `nginx` container
+4. wire `nginx` into local Compose
+5. point frontend local traffic through the gateway where appropriate
+6. create AWS resources for the target architecture
+7. add CD once the AWS side exists
 
-- `nginx`
-- `user-service`
-- `question-service`
-- `matching-service`
-- `collaboration-service`
+## Short Version
 
-### Health checks
+We already have the repo in a decent pre-gateway state.
 
-Add:
+The next step is not more baseline cleanup. It is introducing `nginx` locally, validating the routing model, and then carrying that same shape into AWS:
 
-- ALB health checks for `nginx`
-- ECS container health checks where applicable
-- application-level `/health` endpoints for all services
+- static frontend on `S3 + CloudFront`
+- public API through `ALB -> nginx`
+- private ECS services behind it
 
-### Monitoring and alerting
-
-Add alarms for:
-
-- ECS task failures
-- high ALB 5xx response rates
-- sustained high latency
-- unusual disconnect or websocket error rates on real-time services
-
-## Deployment Sequence
-
-Implement in this order:
-
-1. standardize Dockerfiles and production run commands
-2. create a dedicated `nginx` container and routing config
-3. create ECR repositories
-4. create the ECS cluster and networking
-5. deploy private backend ECS services
-6. deploy the `nginx` ECS service
-7. create the ALB and attach `nginx`
-8. deploy the frontend to S3 + CloudFront
-9. wire Route 53 and ACM
-10. add GitHub Actions CI/CD
-11. add CloudWatch alarms and rollback runbooks
-
-## Expected Deliverables
-
-The final deployment setup should include:
-
-- production Dockerfiles for all deployable services
-- `nginx` configuration for routing and websocket support
-- ECR repositories
-- ECS task definitions and services
-- ALB listener and target group configuration
-- S3 and CloudFront frontend hosting
-- Route 53 DNS records
-- ACM certificates
-- Secrets Manager secret sets
-- GitHub Actions workflows for CI/CD
-- a rollback procedure
-
-## Summary
-
-The recommended production deployment is:
-
-- frontend on `S3 + CloudFront`
-- backend traffic through `ALB -> nginx`
-- private ECS Fargate services for:
-  - `user-service`
-  - `question-service`
-  - `matching-service`
-  - `collaboration-service`
-
-This keeps the frontend static and cheap to host, keeps all backend services independently deployable, and gives you one controlled API boundary without taking on Kubernetes complexity.
+That keeps the system simple enough to operate now while still leaving room to scale the architecture later.
