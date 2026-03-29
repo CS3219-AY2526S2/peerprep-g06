@@ -1,17 +1,18 @@
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+
 describe('Supabase Client', () => {
-  const mockCreateClient = jest.fn();
+  const mockCreateClient = vi.fn();
 
   beforeEach(() => {
-    jest.resetModules();
-    jest.clearAllMocks();
+    vi.resetModules();
+    vi.clearAllMocks();
 
-    jest.doMock('@supabase/supabase-js', () => ({
+    vi.doMock('@supabase/supabase-js', () => ({
       createClient: mockCreateClient,
     }));
 
-    // ✅ prevent dotenv from overriding env
-    jest.doMock('dotenv', () => ({
-      config: jest.fn(),
+    vi.doMock('dotenv', () => ({
+      default: { config: vi.fn() },
     }));
 
     process.env = {
@@ -21,24 +22,18 @@ describe('Supabase Client', () => {
     };
   });
 
-  it('should create supabase client with correct config', () => {
-    require('../src/lib/supabase');
-
+  it('should create supabase client with correct config', async () => {
+    const { supabase } = await import('../src/lib/supabase');
     expect(mockCreateClient).toHaveBeenCalledWith('https://test.supabase.co', 'test-key');
   });
 
-  it('should throw error if env vars missing', () => {
-    jest.resetModules();
-
-    jest.doMock('dotenv', () => ({
-      config: jest.fn(),
-    }));
-
+  it('should throw error if env vars missing', async () => {
+    vi.resetModules();
+    vi.doMock('dotenv', () => ({ default: { config: vi.fn() } }));
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_KEY;
-
-    expect(() => {
-      require('../src/lib/supabase');
-    }).toThrow('Missing Supabase environment variables');
+    await expect(() => import('../src/lib/supabase')).rejects.toThrow(
+      'Missing Supabase environment variables',
+    );
   });
 });

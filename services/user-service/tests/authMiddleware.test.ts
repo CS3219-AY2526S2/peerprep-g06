@@ -1,112 +1,89 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import { authenticate } from '../src/middleware/authMiddleware';
 
-// ✅ Mock the Supabase module inline
-jest.mock('../src/lib/supabase', () => {
-  return {
-    supabase: {
-      auth: {
-        getUser: jest.fn(),
-      },
-      from: jest.fn(),
-    },
-  };
-});
+vi.mock('../src/lib/supabase', () => ({
+  supabase: {
+    auth: { getUser: vi.fn() },
+    from: vi.fn(),
+  },
+}));
 
-// Import supabase AFTER jest.mock so TypeScript sees the mocked version
 import { supabase } from '../src/lib/supabase';
 
-describe('authMiddleware', () => {
-  let mockRequest: Partial<Request>;
-  let mockResponse: Partial<Response>;
-  let mockNext: NextFunction;
-  let mockJson: jest.Mock;
-  let mockStatus: jest.Mock;
+const mockRes = () => {
+  const res = {} as Response;
+  res.status = vi.fn().mockReturnValue(res);
+  res.json = vi.fn().mockReturnValue(res);
+  return res;
+};
 
-  beforeEach(() => {
-    mockJson = jest.fn();
-    mockStatus = jest.fn().mockReturnThis();
-    mockNext = jest.fn();
-    mockRequest = {};
-    mockResponse = { json: mockJson, status: mockStatus };
-    jest.clearAllMocks();
+const mockNext: NextFunction = vi.fn();
+
+beforeEach(() => vi.clearAllMocks());
+
+describe('authenticate middleware', () => {
+  const middleware = authenticate('admin');
+
+  it('returns 401 if no authorization header', async () => {
+    const req = { headers: {} } as Request;
+    const res = mockRes();
+    await middleware(req, res, mockNext);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: 'No authorization header' });
+    expect(mockNext).not.toHaveBeenCalled();
   });
 
-  describe('authenticate', () => {
-    const middleware = authenticate('admin');
+  it('returns 401 if token is invalid', async () => {
+    vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({
+      data: { user: null },
+      error: { message: 'Invalid JWT' },
+    } as any);
 
-    it('should call next if authenticated and has correct role', async () => {
-      mockRequest.headers = { authorization: 'Bearer token123' };
+    const req = { headers: { authorization: 'Bearer badtoken' } } as Request;
+    const res = mockRes();
+    await middleware(req, res, mockNext);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Invalid token' });
+    expect(mockNext).not.toHaveBeenCalled();
+  });
 
-      // ✅ cast to jest.Mock
-      (supabase.auth.getUser as jest.Mock).mockResolvedValue({
-        data: { user: { id: 'user123' } },
-        error: null,
-      });
+  it('returns 403 if insufficient permissions', async () => {
+    vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({
+      data: { user: { id: 'user-123' } },
+      error: null,
+    } as any);
 
-      const mockSelect = jest.fn().mockReturnThis();
-      const mockEq = jest.fn().mockReturnThis();
-      const mockSingle = jest.fn().mockResolvedValue({ data: { role: 'admin' } });
+    vi.mocked(supabase.from).mockReturnValueOnce({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValueOnce({ data: { role: 'user' }, error: null }),
+    } as any);
 
-      (supabase.from as jest.Mock).mockReturnValue({
-        select: mockSelect,
-        eq: mockEq,
-        single: mockSingle,
-      });
+    const req = { headers: { authorization: 'Bearer validtoken' } } as Request;
+    const res = mockRes();
+    await middleware(req, res, mockNext);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Insufficient permissions' });
+    expect(mockNext).not.toHaveBeenCalled();
+  });
 
-      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
+  it('calls next() if user has correct role', async () => {
+    vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({
+      data: { user: { id: 'user-123' } },
+      error: null,
+    } as any);
 
-      expect(mockNext).toHaveBeenCalled();
-    });
+    vi.mocked(supabase.from).mockReturnValueOnce({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValueOnce({ data: { role: 'admin' }, error: null }),
+    } as any);
 
-    it('should return 401 if no authorization header', async () => {
-      mockRequest.headers = {};
-
-      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockStatus).toHaveBeenCalledWith(401);
-      expect(mockJson).toHaveBeenCalledWith({ error: 'No authorization header' });
-      expect(mockNext).not.toHaveBeenCalled();
-    });
-
-    it('should return 401 if invalid token', async () => {
-      mockRequest.headers = { authorization: 'Bearer invalid' };
-
-      (supabase.auth.getUser as jest.Mock).mockResolvedValue({
-        data: { user: null },
-        error: new Error('Invalid token'),
-      });
-
-      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockStatus).toHaveBeenCalledWith(401);
-      expect(mockJson).toHaveBeenCalledWith({ error: 'Invalid token' });
-      expect(mockNext).not.toHaveBeenCalled();
-    });
-
-    it('should return 403 if insufficient permissions', async () => {
-      mockRequest.headers = { authorization: 'Bearer token123' };
-
-      (supabase.auth.getUser as jest.Mock).mockResolvedValue({
-        data: { user: { id: 'user123' } },
-        error: null,
-      });
-
-      const mockSelect = jest.fn().mockReturnThis();
-      const mockEq = jest.fn().mockReturnThis();
-      const mockSingle = jest.fn().mockResolvedValue({ data: { role: 'user' } });
-
-      (supabase.from as jest.Mock).mockReturnValue({
-        select: mockSelect,
-        eq: mockEq,
-        single: mockSingle,
-      });
-
-      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
-
-      expect(mockStatus).toHaveBeenCalledWith(403);
-      expect(mockJson).toHaveBeenCalledWith({ error: 'Insufficient permissions' });
-      expect(mockNext).not.toHaveBeenCalled();
-    });
+    const req = { headers: { authorization: 'Bearer validtoken' } } as Request;
+    const res = mockRes();
+    await middleware(req, res, mockNext);
+    expect(mockNext).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
   });
 });
