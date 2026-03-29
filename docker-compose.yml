@@ -5,7 +5,7 @@ services:
     build: ./services/user-service
     container_name: peerprep-user-service
     ports:
-      - "${USER_SERVICE_PORT:-3001}:3001"
+      - '${USER_SERVICE_PORT:-3001}:3001'
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
@@ -22,7 +22,7 @@ services:
     build: ./services/question-service
     container_name: peerprep-question-service
     ports:
-      - "${QUESTION_SERVICE_PORT:-3002}:3002"
+      - '${QUESTION_SERVICE_PORT:-3002}:3002'
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
@@ -41,7 +41,7 @@ services:
       dockerfile: services/matching-service/Dockerfile
     container_name: peerprep-matching-service
     ports:
-      - "${MATCHING_SERVICE_PORT:-3003}:3003"
+      - '${MATCHING_SERVICE_PORT:-3003}:3003'
     environment:
       - REDIS_USERNAME=${REDIS_USERNAME}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
@@ -68,7 +68,7 @@ services:
     build: ./services/collaboration-service
     container_name: peerprep-collaboration-service
     ports:
-      - "${COLLAB_SERVICE_PORT:-3004}:3004"
+      - '${COLLAB_SERVICE_PORT:-3004}:3004'
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
@@ -102,8 +102,8 @@ services:
     container_name: rabbitmq
     restart: unless-stopped
     ports:
-      - "15672:15672"
-      - "5672:5672"
+      - '15672:15672'
+      - '5672:5672'
     environment:
       RABBITMQ_DEFAULT_USER: user
       RABBITMQ_DEFAULT_PASS: root
@@ -115,7 +115,7 @@ services:
       test:
         - CMD
         - rabbitmq-diagnostics
-        - "-q"
+        - '-q'
         - ping
       retries: 3
       timeout: 5s
