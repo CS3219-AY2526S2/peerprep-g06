@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Header, Features } from '@/components/Header';
-import { ArrowRight, Code2, Users, Zap, CheckCircle } from 'lucide-react';
+import { ArrowRight, Code2, Zap, CheckCircle } from 'lucide-react';
 
 const Index = () => {
   return (

@@ -21,6 +21,7 @@ export const MatchingSetup = () => {
     setTopic,
     setLanguage,
     setCurrentState,
+    clearPendingSession,
   } = useAppStore();
   const { signOut } = useAuth();
   const [localDifficulty, setLocalDifficulty] = useState<Difficulty | null>(selectedDifficulty);
@@ -36,6 +37,7 @@ export const MatchingSetup = () => {
 
   const handleStartMatching = () => {
     if (localDifficulty && localTopic && localLanguage) {
+      clearPendingSession();
       setDifficulty(localDifficulty);
       setTopic(localTopic);
       setLanguage(localLanguage);
