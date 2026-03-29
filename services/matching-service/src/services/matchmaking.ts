@@ -115,8 +115,19 @@ export async function createMatch(user: User, candidate: User, queueKey: string,
         status: MatchStatus.MATCHED,
     };
 
-    // publish the match to rabbitMQ
-    await publishEvent('match', 'created', { match });
+await publishEvent('match', 'found', {
+  matchFound: {
+    eventVersion: 1,
+    matchId: match.id,
+    user1Id: match.user1Id,
+    user2Id: match.user2Id,
+    difficulty: match.difficulty,
+    topic: match.commonTopic,
+    language: match.commonLanguage,
+    question: match.question,
+    matchedAt: match.createdAt.toISOString(),
+  },
+});
 
     return match;
 }
