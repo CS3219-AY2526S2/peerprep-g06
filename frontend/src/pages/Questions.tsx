@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { QUESTION_ENDPOINTS } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 interface Question {
   id: string;
@@ -51,6 +52,8 @@ const Questions = () => {
   const [form, setForm] = useState(emptyForm);
   const [formLoading, setFormLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.role !== 'admin' && user?.role !== 'developer') {
@@ -298,7 +301,10 @@ const Questions = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(question.id)}
+                      onClick={() => {
+                        setPendingDeleteId(question.id);
+                        setShowDeleteModal(true);
+                      }}
                       disabled={deleteLoading === question.id}
                       className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     >
@@ -316,7 +322,7 @@ const Questions = () => {
         </div>
       </main>
 
-      {/* Modal */}
+      {/* Add/Edit Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
@@ -426,6 +432,24 @@ const Questions = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirm Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        title="Delete question?"
+        description="This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (pendingDeleteId) handleDelete(pendingDeleteId);
+          setShowDeleteModal(false);
+          setPendingDeleteId(null);
+        }}
+        onCancel={() => {
+          setShowDeleteModal(false);
+          setPendingDeleteId(null);
+        }}
+      />
     </div>
   );
 };

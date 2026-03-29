@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useCollabNotifications } from '@/hooks/useCollabNotifications';
 import { useAppStore } from '@/store/useAppStore';
 import { useMatchmaking } from '@/hooks/useMatchmaking';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,9 +9,20 @@ import { useAuth } from '@/contexts/AuthContext';
 const Queue = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { selectedDifficulty, selectedTopic, selectedLanguage, resetMatching } = useAppStore();
+  const {
+    selectedDifficulty,
+    selectedTopic,
+    selectedLanguage,
+    pendingSession,
+    collabNotificationStatus,
+    collabError,
+    setCurrentState,
+    clearPendingSession,
+    resetMatching,
+  } = useAppStore();
 
   const { joinQueue, cancelQueue, status, matchData, error, timeLeft } = useMatchmaking();
+  useCollabNotifications(user?.id);
 
   // join queue on mount
   useEffect(() => {
@@ -19,6 +31,7 @@ const Queue = () => {
       return;
     }
 
+    clearPendingSession();
     joinQueue({
       userId: user.id,
       difficulty: selectedDifficulty,
@@ -27,14 +40,18 @@ const Queue = () => {
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // navigate on match found
   useEffect(() => {
     if (status === 'matched' && matchData) {
-      // TODO: navigate to collaboration session when implemented
-      // For now, just log and stay on page
       console.log('Match found:', matchData);
     }
   }, [status, matchData]);
+
+  useEffect(() => {
+    if (pendingSession && status === 'matched') {
+      setCurrentState('session');
+      navigate(`/session/${pendingSession.sessionId}`);
+    }
+  }, [navigate, pendingSession, setCurrentState, status]);
 
   const handleCancel = () => {
     cancelQueue();
@@ -60,6 +77,10 @@ const Queue = () => {
             <p className="text-sm text-muted-foreground mb-8">
               Please wait while we find you a coding partner.
             </p>
+            <p className="text-sm text-muted-foreground mb-2">
+              Collaboration notifications: {collabNotificationStatus}
+            </p>
+            {collabError && <p className="text-sm text-red-500 mb-6">{collabError}</p>}
             <Button variant="ghost" onClick={handleCancel}>
               Cancel
             </Button>
@@ -74,7 +95,11 @@ const Queue = () => {
             <p className="text-sm text-muted-foreground mb-8">
               {matchData.difficulty} / {matchData.topic} / {matchData.language}
             </p>
-            <p className="text-sm text-muted-foreground">Collaboration session coming soon...</p>
+            <p className="text-sm text-muted-foreground mb-2">Setting up session...</p>
+            <p className="text-sm text-muted-foreground">
+              Collaboration notifications: {collabNotificationStatus}
+            </p>
+            {collabError && <p className="text-sm text-red-500 mt-4">{collabError}</p>}
           </div>
         )}
 

@@ -8,6 +8,7 @@ import Queue from './pages/Queue';
 import Account from './pages/Account';
 import DevPanel from './pages/DevPanel';
 import Questions from './pages/Questions';
+import Session from './pages/Session';
 
 const App = () => {
   return (
@@ -39,6 +40,15 @@ const App = () => {
         element={
           <ProtectedRoute>
             <Account />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/session/:sessionId"
+        element={
+          <ProtectedRoute>
+            <Session />
           </ProtectedRoute>
         }
       />
