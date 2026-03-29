@@ -5,13 +5,6 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 
-interface ImportMetaEnv {
-  readonly VITE_USER_SERVICE_URL: string;
-}
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
-
 interface AuthContextType {
   user: User | null;
   loading: boolean;
