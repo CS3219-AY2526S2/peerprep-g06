@@ -18,7 +18,10 @@ function buildDeliveryExpiry(): string {
   return new Date(Date.now() + config.joinTokenTtlMs).toISOString();
 }
 
-export async function createSessionReadyPayload(sessionId: string, userId: string): Promise<SessionReadyPayload | null> {
+export async function createSessionReadyPayload(
+  sessionId: string,
+  userId: string,
+): Promise<SessionReadyPayload | null> {
   // A session-ready payload is assembled from the persisted session, question, and per-user join token.
   const [session, question, tokenRecord] = await Promise.all([
     getSession(sessionId),
@@ -63,7 +66,9 @@ export async function deliverPendingNotifications(
   for (const delivery of pendingDeliveries) {
     transport.emitSessionReady(userId, delivery.payload);
     await clearPendingDelivery(userId, delivery.sessionId);
-    logger.info(`Delivered pending session-ready for user ${userId} and session ${delivery.sessionId}`);
+    logger.info(
+      `Delivered pending session-ready for user ${userId} and session ${delivery.sessionId}`,
+    );
   }
 }
 

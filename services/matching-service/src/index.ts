@@ -15,11 +15,11 @@ dotenv.config();
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
-    cors: {
-        // TODO: configure to frontend url when deployed
-        origin: '*',
-        methods: ['GET', 'POST'],
-    },
+  cors: {
+    // TODO: configure to frontend url when deployed
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
 });
 
 // middleware
@@ -28,33 +28,32 @@ app.use(express.json());
 
 // basic health check route
 app.get('/health', (req, res) => {
-    res.status(200).json({ message: 'Matching service is running' });
+  res.status(200).json({ message: 'Matching service is running' });
 });
 
 // socket.io connection handler
 io.on('connection', (socket) => {
-    logger.info(`User connected: ${socket.id}`);
-    registerHandlers(io, socket);
+  logger.info(`User connected: ${socket.id}`);
+  registerHandlers(io, socket);
 });
-
 
 const PORT = process.env.MATCHING_SERVICE_PORT || 3003;
 
 async function startServer() {
-    try {
-        await connectRedis();
-        await setupRedisSubscription();
-        await setupSessionManager(io);
-        await setupTopicExchange();
-        startMatchmakingInterval(io);
-        logger.info('Redis subscription setup complete');
-        server.listen(PORT, () => {
-            logger.info(`Matching service listening on port ${PORT}`);
-        });
-    } catch (error) {
-        logger.error('Error starting server:', error);
-        process.exit(1);
-    }
+  try {
+    await connectRedis();
+    await setupRedisSubscription();
+    await setupSessionManager(io);
+    await setupTopicExchange();
+    startMatchmakingInterval(io);
+    logger.info('Redis subscription setup complete');
+    server.listen(PORT, () => {
+      logger.info(`Matching service listening on port ${PORT}`);
+    });
+  } catch (error) {
+    logger.error('Error starting server:', error);
+    process.exit(1);
+  }
 }
 
 startServer();

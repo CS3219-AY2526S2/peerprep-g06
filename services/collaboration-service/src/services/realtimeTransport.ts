@@ -58,7 +58,9 @@ function getSessionRoom(sessionId: string): string {
   return `${SESSION_ROOM_PREFIX}${sessionId}`;
 }
 
-export function createSocketIoNotificationTransport(io: NotificationNamespace): NotificationTransport {
+export function createSocketIoNotificationTransport(
+  io: NotificationNamespace,
+): NotificationTransport {
   return {
     registerUserSocket(socket: any, userId: string) {
       socket.join(getUserRoom(userId));
@@ -95,7 +97,11 @@ export function createSocketIoSessionTransport(namespace: SessionNamespace): Ses
     emitDocumentUpdateToPeers(sessionId: string, excludedSocketId: string, payload) {
       namespace.except(excludedSocketId).to(getSessionRoom(sessionId)).emit('doc:update', payload);
     },
-    emitParticipantStatus(sessionId: string, payload: ParticipantStatusPayload, excludedSocketId?: string) {
+    emitParticipantStatus(
+      sessionId: string,
+      payload: ParticipantStatusPayload,
+      excludedSocketId?: string,
+    ) {
       const room = getSessionRoom(sessionId);
 
       if (excludedSocketId) {

@@ -3,6 +3,7 @@
 This guide will help you connect to our Redis Cloud database for the matching service.
 
 ## Table of Contents
+
 - [Prerequisites](#prerequisites)
 - [Environment Setup](#environment-setup)
 - [Connection Methods](#connection-methods)
@@ -53,6 +54,7 @@ cd ../..  # Go to project root
 ```
 
 Add to `.env`:
+
 ```env
 REDIS_USERNAME
 REDIS_PASSWORD
@@ -78,6 +80,7 @@ alias redis-cloud='~/Documents/NUS\ CS/y2s2/CS3219/peerprep-g06/scripts/redis-co
 ```
 
 Then reload your shell:
+
 ```bash
 source ~/.zshrc  # or source ~/.bashrc
 ```
@@ -85,11 +88,13 @@ source ~/.zshrc  # or source ~/.bashrc
 #### Usage
 
 **Interactive Mode:**
+
 ```bash
 redis-cloud
 ```
 
 This drops you into a Redis CLI session where you can run commands:
+
 ```
 127.0.0.1:14059> PING
 PONG
@@ -99,6 +104,7 @@ PONG
 ```
 
 **Single Command Mode:**
+
 ```bash
 redis-cloud PING
 redis-cloud KEYS "*"
@@ -123,12 +129,14 @@ redis-cli -h redis-14059.crce185.ap-seast-1-1.ec2.cloud.redislabs.com \
 The matching service automatically connects to Redis Cloud when you run it. The connection is configured in `src/config/redis.ts`.
 
 **Using Docker:**
+
 ```bash
 # From project root
 docker compose up
 ```
 
 **Using npm (Local Development):**
+
 ```bash
 # From matching-service directory
 cd services/matching-service
@@ -149,6 +157,7 @@ redis-cloud PING
 ```
 
 **Expected output:**
+
 ```
 PONG
 ```
@@ -172,25 +181,29 @@ redis-cloud DEL test_key
 ### Verify Application Connection
 
 1. **Start the matching service:**
+
    ```bash
    # From project root
    docker compose up
    ```
 
 2. **Check the logs for:**
+
    ```
    [INFO] Redis client connected
    [INFO] Matching service listening on port 3002
    ```
 
 3. **Test the health endpoint:**
+
    ```bash
    curl http://localhost:3002/health
    ```
 
    Expected response:
+
    ```json
-   {"message":"Matching service is running"}
+   { "message": "Matching service is running" }
    ```
 
 ---
@@ -200,11 +213,13 @@ redis-cloud DEL test_key
 ### Issue 1: "Connection refused" or "ECONNREFUSED"
 
 **Possible causes:**
+
 - Redis Cloud credentials are incorrect
 - Network/firewall blocking the connection
 - Redis Cloud instance is down
 
 **Solutions:**
+
 1. Verify your credentials in `.env`
 2. Check if you can ping the Redis host:
    ```bash
@@ -218,17 +233,20 @@ redis-cloud DEL test_key
 **Cause:** Missing or incorrect password/username
 
 **Solution:**
+
 - Double-check your `REDIS_PASSWORD` and `REDIS_USERNAME` in `.env`
 - Make sure there are no extra spaces or quotes
 
 ### Issue 3: Port 3002 already in use
 
 **Error message:**
+
 ```
 Error: listen EADDRINUSE: address already in use :::3002
 ```
 
 **Solution:**
+
 ```bash
 # Find what's using the port
 lsof -i :3002
@@ -243,6 +261,7 @@ docker compose down
 ### Issue 4: "redis-cloud: command not found"
 
 **Solution:**
+
 ```bash
 # Make sure the script is executable
 chmod +x ~/Documents/NUS\ CS/y2s2/CS3219/peerprep-g06/scripts/redis-connect.sh
@@ -254,10 +273,12 @@ source ~/.zshrc  # or ~/.bashrc
 ### Issue 5: Environment variables not loading
 
 **In Docker:**
+
 - Make sure `.env` file is in the project root
 - Restart Docker containers: `docker compose down && docker compose up`
 
 **In Local Development:**
+
 - Make sure `.env` is in `services/matching-service/`
 - The service loads `.env` using `dotenv` package
 

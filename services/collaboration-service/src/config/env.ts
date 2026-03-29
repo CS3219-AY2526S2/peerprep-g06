@@ -18,7 +18,8 @@ export const config = {
   port: parseNumber(process.env.COLLAB_SERVICE_PORT, 3004),
   frontendOrigin: process.env.COLLAB_FRONTEND_ORIGIN || DEFAULT_FRONTEND_ORIGIN,
   publicWebsocketUrl:
-    process.env.COLLAB_PUBLIC_WS_URL || `http://localhost:${parseNumber(process.env.COLLAB_SERVICE_PORT, 3004)}`,
+    process.env.COLLAB_PUBLIC_WS_URL ||
+    `http://localhost:${parseNumber(process.env.COLLAB_SERVICE_PORT, 3004)}`,
   gracePeriodMs: parseNumber(process.env.COLLAB_GRACE_PERIOD_MS, 30_000),
   joinTokenTtlMs: parseNumber(process.env.COLLAB_JOIN_TOKEN_TTL_MS, 300_000),
   // Supabase is only used here to verify that notification sockets belong to real authenticated users.

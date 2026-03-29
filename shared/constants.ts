@@ -23,10 +23,10 @@ export const DIFFICULTIES = [
 ] as const;
 
 export const LANGUAGES = [
-    { id: 'javascript', label: 'JavaScript' },
-    { id: 'python', label: 'Python' },
-    { id: 'java', label: 'Java' },
-    { id: 'cpp', label: 'C++' },
-    { id: 'typescript', label: 'TypeScript' },
-    { id: 'go', label: 'Go' },
+  { id: 'javascript', label: 'JavaScript' },
+  { id: 'python', label: 'Python' },
+  { id: 'java', label: 'Java' },
+  { id: 'cpp', label: 'C++' },
+  { id: 'typescript', label: 'TypeScript' },
+  { id: 'go', label: 'Go' },
 ] as const;
