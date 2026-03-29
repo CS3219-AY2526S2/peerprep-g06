@@ -116,7 +116,8 @@ jobs:
             context: .
             dockerfile: services/matching-service/Dockerfile
           - name: collaboration-service
-            context: services/collaboration-service
+            context: .
+            dockerfile: services/collaboration-service/Dockerfile
 
     steps:
       - name: Check out repository

@@ -65,7 +65,9 @@ services:
     command: npm run dev
 
   collaboration-service:
-    build: ./services/collaboration-service
+    build:
+      context: .
+      dockerfile: services/collaboration-service/Dockerfile
     container_name: peerprep-collaboration-service
     ports:
       - '${COLLAB_SERVICE_PORT:-3004}:3004'
@@ -89,6 +91,7 @@ services:
       - NODE_ENV=development
     volumes:
       - ./services/collaboration-service:/app
+      - ./shared:/shared
       - /app/node_modules
     depends_on:
       rabbitmq:

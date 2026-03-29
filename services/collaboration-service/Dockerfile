@@ -1,13 +1,23 @@
-FROM node:18-alpine
+FROM node:24-alpine
+
+WORKDIR /
+
+# Copy and build the shared rabbitmq module
+COPY shared/rabbitmq /shared/rabbitmq
+RUN cd /shared/rabbitmq && rm -rf node_modules && npm install --include=dev && ./node_modules/.bin/tsc
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY services/collaboration-service/package*.json ./
 
-RUN npm install
+RUN npm ci
 
-COPY . .
+COPY services/collaboration-service/ .
+
+RUN npm run build && npm prune --omit=dev
+
+ENV NODE_ENV=production
 
 EXPOSE 3004
 
-CMD ["npm", "run", "dev"]
+CMD ["npm", "start"]
