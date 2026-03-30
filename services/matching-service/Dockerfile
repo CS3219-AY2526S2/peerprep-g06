@@ -1,14 +1,12 @@
 FROM node:24-alpine
 
-WORKDIR /repo/services/matching-service
+WORKDIR /app
 
-COPY services/matching-service/package*.json ./
+COPY package*.json ./
 
 RUN npm ci
 
-COPY services/matching-service/ ./
-COPY shared/types.ts /repo/shared/types.ts
-COPY shared/constants.ts /repo/shared/constants.ts
+COPY . .
 
 RUN npm run build && npm prune --omit=dev
 

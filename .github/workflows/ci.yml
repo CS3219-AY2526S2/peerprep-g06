@@ -140,8 +140,7 @@ jobs:
           - name: question-service
             context: services/question-service
           - name: matching-service
-            context: .
-            dockerfile: services/matching-service/Dockerfile
+            context: services/matching-service
           - name: collaboration-service
             context: services/collaboration-service
 
