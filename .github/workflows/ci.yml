@@ -45,8 +45,8 @@ jobs:
           - name: user-service
             path: services/user-service
             lockfile: services/user-service/package-lock.json
-            run_tests: false
-            run_coverage: false
+            run_tests: true
+            run_coverage: true
           - name: question-service
             path: services/question-service
             lockfile: services/question-service/package-lock.json
@@ -92,9 +92,41 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run test:coverage
 
+      - name: Upload coverage artifact
+        if: matrix.run_coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.name }}
+          path: ${{ matrix.path }}/coverage/lcov.info
+          if-no-files-found: error
+
       - name: Build package
         working-directory: ${{ matrix.path }}
         run: npm run build
+
+  codecov:
+    name: Upload Coverage to Codecov
+    runs-on: ubuntu-latest
+    needs: packages
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage-artifacts
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: |
+            coverage-artifacts/coverage-question-service/lcov.info
+            coverage-artifacts/coverage-user-service/lcov.info
+          flags: question-service,user-service
+          fail_ci_if_error: true
 
   docker:
     name: Docker Build ${{ matrix.name }}
