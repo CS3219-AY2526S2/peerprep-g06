@@ -1,0 +1,15 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
+    patch:
+      default:
+        target: 80%
+
+ignore:
+  - 'shared/**'
+  - '**/index.ts'
+  - '**/*.d.ts'
+  - 'scripts/**'
