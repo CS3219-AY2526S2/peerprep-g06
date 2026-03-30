@@ -2,7 +2,9 @@
 # prod deployment handled separately through AWS infrastructure
 services:
   user-service:
-    build: ./services/user-service
+    build:
+      context: ./services/user-service
+      target: dev
     container_name: peerprep-user-service
     ports:
       - '${USER_SERVICE_PORT:-3001}:3001'
@@ -19,7 +21,9 @@ services:
     command: npm run dev
 
   question-service:
-    build: ./services/question-service
+    build:
+      context: ./services/question-service
+      target: dev
     container_name: peerprep-question-service
     ports:
       - '${QUESTION_SERVICE_PORT:-3002}:3002'
@@ -39,6 +43,7 @@ services:
     build:
       context: .
       dockerfile: services/matching-service/Dockerfile
+      target: dev
     container_name: peerprep-matching-service
     ports:
       - '${MATCHING_SERVICE_PORT:-3003}:3003'
@@ -65,7 +70,9 @@ services:
     command: npm run dev
 
   collaboration-service:
-    build: ./services/collaboration-service
+    build:
+      context: ./services/collaboration-service
+      target: dev
     container_name: peerprep-collaboration-service
     ports:
       - '${COLLAB_SERVICE_PORT:-3004}:3004'
