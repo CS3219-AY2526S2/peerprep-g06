@@ -36,7 +36,9 @@ services:
     command: npm run dev
 
   matching-service:
-    build: ./services/matching-service
+    build:
+      context: .
+      dockerfile: services/matching-service/Dockerfile
     container_name: peerprep-matching-service
     ports:
       - '${MATCHING_SERVICE_PORT:-3003}:3003'
@@ -52,8 +54,9 @@ services:
       - LOG_LEVEL=debug
       - RABBITMQ_URL=amqp://user:root@rabbitmq:5672
     volumes:
-      - ./services/matching-service:/app
-      - /app/node_modules
+      - ./services/matching-service:/repo/services/matching-service
+      - ./shared:/repo/shared
+      - /repo/services/matching-service/node_modules
     depends_on:
       rabbitmq:
         condition: service_healthy
