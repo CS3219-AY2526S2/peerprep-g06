@@ -20,11 +20,13 @@ Follow this checklist to get the matching service up and running on your machine
 ### Step 2: Environment Setup
 
 - [ ] Navigate to matching service directory:
+
   ```bash
   cd services/matching-service
   ```
 
 - [ ] Copy the example env file:
+
   ```bash
   cp .env.example .env
   ```
@@ -46,19 +48,21 @@ Follow this checklist to get the matching service up and running on your machine
 ### Step 4: Test Redis Connection
 
 - [ ] Install redis-cli if not already installed:
+
   ```bash
   # macOS
   brew install redis
-  
+
   # Ubuntu/Debian
   sudo apt-get install redis-tools
   ```
 
 - [ ] Test connection using the script:
+
   ```bash
   ../../scripts/redis-connect.sh PING
   ```
-  
+
   Expected output: `PONG`
 
 ### Step 5: Run the Service
@@ -68,11 +72,13 @@ Follow this checklist to get the matching service up and running on your machine
 #### Option A: Using Docker (Recommended)
 
 - [ ] Navigate to project root:
+
   ```bash
   cd ../..
   ```
 
 - [ ] Start the service:
+
   ```bash
   docker compose up
   ```
@@ -88,6 +94,7 @@ Follow this checklist to get the matching service up and running on your machine
 - [ ] Stay in matching service directory
 
 - [ ] Run development server:
+
   ```bash
   npm run dev
   ```
@@ -97,13 +104,15 @@ Follow this checklist to get the matching service up and running on your machine
 ### Step 6: Verify Everything Works
 
 - [ ] Test health endpoint:
+
   ```bash
   curl http://localhost:3002/health
   ```
-  
+
   Expected: `{"message":"Matching service is running"}`
 
 - [ ] Check Redis connection in logs:
+
   ```
   [INFO] Redis client connected
   ```
@@ -119,6 +128,7 @@ Your matching service should now be running and connected to Redis Cloud.
 ### Issue: Port 3002 already in use
 
 **Solution:**
+
 ```bash
 # Stop other services using the port
 docker compose down
@@ -131,6 +141,7 @@ kill -9 <PID>
 ### Issue: Redis connection failed
 
 **Solution:**
+
 - Double-check your `.env` credentials
 - Make sure there are no extra spaces
 - Try the connection test again: `redis-cloud PING`
@@ -138,6 +149,7 @@ kill -9 <PID>
 ### Issue: npm install fails
 
 **Solution:**
+
 ```bash
 # Clear npm cache
 npm cache clean --force
@@ -150,6 +162,7 @@ npm install
 ### Issue: Docker container won't start
 
 **Solution:**
+
 ```bash
 # Rebuild containers
 docker compose down

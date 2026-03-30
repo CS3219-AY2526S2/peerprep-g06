@@ -50,7 +50,8 @@ export const collabKeys = {
   joinToken: (sessionId: string, userId: string) => `collab:session:${sessionId}:token:${userId}`,
   graceTimer: (sessionId: string, userId: string) => `collab:session:${sessionId}:grace:${userId}`,
   // Pending deliveries are indexed per user so they can be replayed on reconnect.
-  pendingDelivery: (userId: string, sessionId: string) => `collab:user:${userId}:delivery:${sessionId}`,
+  pendingDelivery: (userId: string, sessionId: string) =>
+    `collab:user:${userId}:delivery:${sessionId}`,
   pendingDeliveryIndex: (userId: string) => `collab:user:${userId}:deliveries`,
 } as const;
 
@@ -75,7 +76,10 @@ export async function getSessionIdByMatchId(matchId: string): Promise<string | n
   return redis.get(collabKeys.matchSession(matchId));
 }
 
-export async function persistSessionSeed(matchId: string, seed: PersistedSessionSeed): Promise<void> {
+export async function persistSessionSeed(
+  matchId: string,
+  seed: PersistedSessionSeed,
+): Promise<void> {
   // The first session write is done as one Redis transaction so the service never sees a half-created session.
   const ttlSeconds = sessionTtlSeconds();
   const transaction = redis.multi();
@@ -86,9 +90,13 @@ export async function persistSessionSeed(matchId: string, seed: PersistedSession
   transaction.set(collabKeys.session(seed.session.sessionId), JSON.stringify(seed.session), {
     EX: ttlSeconds,
   });
-  transaction.set(collabKeys.participants(seed.session.sessionId), JSON.stringify(seed.participants), {
-    EX: ttlSeconds,
-  });
+  transaction.set(
+    collabKeys.participants(seed.session.sessionId),
+    JSON.stringify(seed.participants),
+    {
+      EX: ttlSeconds,
+    },
+  );
   transaction.set(collabKeys.question(seed.session.sessionId), JSON.stringify(seed.question), {
     EX: ttlSeconds,
   });
@@ -143,7 +151,10 @@ export async function getParticipants(sessionId: string): Promise<SessionPartici
   return parseJson<SessionParticipant[]>(await redis.get(collabKeys.participants(sessionId)));
 }
 
-export async function saveParticipants(sessionId: string, participants: SessionParticipant[]): Promise<void> {
+export async function saveParticipants(
+  sessionId: string,
+  participants: SessionParticipant[],
+): Promise<void> {
   await redis.set(collabKeys.participants(sessionId), JSON.stringify(participants), {
     EX: sessionTtlSeconds(),
   });
@@ -181,7 +192,9 @@ export async function saveDocumentSnapshot(snapshot: SessionDocumentSnapshot): P
   });
 }
 
-export async function getDocumentSnapshot(sessionId: string): Promise<SessionDocumentSnapshot | null> {
+export async function getDocumentSnapshot(
+  sessionId: string,
+): Promise<SessionDocumentSnapshot | null> {
   return parseJson<SessionDocumentSnapshot>(await redis.get(collabKeys.document(sessionId)));
 }
 
@@ -190,9 +203,13 @@ export async function savePendingDelivery(record: PendingDeliveryRecord): Promis
   const ttlSeconds = deliveryTtlSeconds(record);
   const transaction = redis.multi();
 
-  transaction.set(collabKeys.pendingDelivery(record.userId, record.sessionId), JSON.stringify(record), {
-    EX: ttlSeconds,
-  });
+  transaction.set(
+    collabKeys.pendingDelivery(record.userId, record.sessionId),
+    JSON.stringify(record),
+    {
+      EX: ttlSeconds,
+    },
+  );
   transaction.sAdd(collabKeys.pendingDeliveryIndex(record.userId), record.sessionId);
   transaction.expire(collabKeys.pendingDeliveryIndex(record.userId), ttlSeconds);
 
@@ -203,7 +220,9 @@ export async function getPendingDelivery(
   userId: string,
   sessionId: string,
 ): Promise<PendingDeliveryRecord | null> {
-  return parseJson<PendingDeliveryRecord>(await redis.get(collabKeys.pendingDelivery(userId, sessionId)));
+  return parseJson<PendingDeliveryRecord>(
+    await redis.get(collabKeys.pendingDelivery(userId, sessionId)),
+  );
 }
 
 export async function clearPendingDelivery(userId: string, sessionId: string): Promise<void> {
@@ -220,7 +239,9 @@ export async function listPendingDeliveries(userId: string): Promise<PendingDeli
     return [];
   }
 
-  const deliveries = await Promise.all(sessionIds.map((sessionId) => getPendingDelivery(userId, sessionId)));
+  const deliveries = await Promise.all(
+    sessionIds.map((sessionId) => getPendingDelivery(userId, sessionId)),
+  );
   const validDeliveries: PendingDeliveryRecord[] = [];
 
   for (let index = 0; index < sessionIds.length; index += 1) {
@@ -255,7 +276,10 @@ export async function clearGracePeriod(sessionId: string, userId: string): Promi
 }
 
 export async function deleteSessionState(sessionId: string): Promise<void> {
-  const [session, participants] = await Promise.all([getSession(sessionId), getParticipants(sessionId)]);
+  const [session, participants] = await Promise.all([
+    getSession(sessionId),
+    getParticipants(sessionId),
+  ]);
   if (!session) {
     return;
   }

@@ -3,8 +3,12 @@
   "version": "1.0.0",
   "description": "Collaboration service for PeerPrep",
   "main": "dist/index.js",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
     "build": "tsc",
     "start": "node dist/index.js"
   },
@@ -18,7 +22,7 @@
     "yjs": "^13.6.27"
   },
   "devDependencies": {
-    "@types/amqplib": "^0.10.7",
+    "@types/amqplib": "^0.10.8",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.2",

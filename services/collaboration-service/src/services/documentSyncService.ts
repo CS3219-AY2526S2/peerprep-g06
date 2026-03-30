@@ -158,7 +158,10 @@ export async function applyDocumentUpdate(
   };
 }
 
-export async function disposeDocument(sessionId: string, flushBeforeDispose = false): Promise<void> {
+export async function disposeDocument(
+  sessionId: string,
+  flushBeforeDispose = false,
+): Promise<void> {
   if (flushBeforeDispose) {
     await flushDocumentSnapshot(sessionId);
   }

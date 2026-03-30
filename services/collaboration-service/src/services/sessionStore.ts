@@ -17,7 +17,12 @@ interface JoinTokenRecord {
   claims: JoinTokenClaims;
 }
 
-function createJoinToken(matchId: string, sessionId: string, userId: string, nowIso: string): JoinTokenRecord {
+function createJoinToken(
+  matchId: string,
+  sessionId: string,
+  userId: string,
+  nowIso: string,
+): JoinTokenRecord {
   // Join tokens are generated here, then their verification record is stored in Redis.
   const token = randomBytes(32).toString('base64url');
   const claims: JoinTokenClaims = {
