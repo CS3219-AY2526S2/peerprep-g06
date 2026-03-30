@@ -161,11 +161,11 @@ Purpose:
 
 Variables:
 
-- `COLLAB_SERVICE_PORT`
-- `COLLAB_FRONTEND_ORIGIN`
-- `COLLAB_PUBLIC_WS_URL`
-- `COLLAB_GRACE_PERIOD_MS`
-- `COLLAB_JOIN_TOKEN_TTL_MS`
+- `PORT`
+- `FRONTEND_ORIGIN`
+- `PUBLIC_WS_URL`
+- `GRACE_PERIOD_MS`
+- `JOIN_TOKEN_TTL_MS`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_KEY`
 - `RABBITMQ_URL`
@@ -318,12 +318,12 @@ Read top to bottom:
 3. `MatchFoundEvent`
 4. `JoinTokenClaims`
 5. `SessionReadyPayload`
-7. notification socket events
-8. `SessionJoinedPayload`
-9. document sync payloads
-10. participant status payload
-11. session-ended payload
-12. session namespace event interfaces
+6. notification socket events
+7. `SessionJoinedPayload`
+8. document sync payloads
+9. participant status payload
+10. session-ended payload
+11. session namespace event interfaces
 
 Important contracts:
 
@@ -780,14 +780,14 @@ The frontend team needs to implement two socket phases.
 3. after socket connect, emit:
 
 ```ts
-socket.emit('notification:register', { userId })
+socket.emit('notification:register', { userId });
 ```
 
 4. listen for:
 
 ```ts
-'session-ready'
-'notification:error'
+'session-ready';
+'notification:error';
 ```
 
 ### Session Phase
@@ -809,7 +809,7 @@ socket.emit('notification:register', { userId })
 6. when the user explicitly leaves, emit:
 
 ```ts
-socket.emit('session:leave')
+socket.emit('session:leave');
 ```
 
 ### Frontend Notes

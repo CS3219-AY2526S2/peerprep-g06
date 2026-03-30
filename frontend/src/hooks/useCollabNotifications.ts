@@ -1,19 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { SessionReadyPayload } from '../../../shared/types';
-import {
-  createNotificationSocket,
-  getCollabAccessToken,
-  NotificationSocket,
-} from '@/lib/collab';
+import { createNotificationSocket, getCollabAccessToken, NotificationSocket } from '@/lib/collab';
 import { useAppStore } from '@/store/useAppStore';
 
 export function useCollabNotifications(userId?: string) {
   const socketRef = useRef<NotificationSocket | null>(null);
-  const {
-    setPendingSession,
-    setCollabNotificationStatus,
-    setCollabError,
-  } = useAppStore();
+  const { setPendingSession, setCollabNotificationStatus, setCollabError } = useAppStore();
 
   useEffect(() => {
     let isMounted = true;

@@ -7,13 +7,8 @@ import { useAppStore } from '@/store/useAppStore';
 const Session = () => {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
-  const {
-    pendingSession,
-    collabSessionStatus,
-    collabError,
-    setCurrentState,
-    clearPendingSession,
-  } = useAppStore();
+  const { pendingSession, collabSessionStatus, collabError, setCurrentState, clearPendingSession } =
+    useAppStore();
 
   const {
     joinedSession,
@@ -146,7 +141,9 @@ const Session = () => {
               <div className="rounded-lg bg-background/80 p-4 text-sm">
                 <p className="font-medium">Join state</p>
                 <p className="text-muted-foreground mt-1">
-                  {joinedSession ? `Joined as ${joinedSession.userId}` : 'Waiting for session:joined'}
+                  {joinedSession
+                    ? `Joined as ${joinedSession.userId}`
+                    : 'Waiting for session:joined'}
                 </p>
               </div>
             </div>

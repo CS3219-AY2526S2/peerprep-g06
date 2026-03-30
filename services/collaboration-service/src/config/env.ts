@@ -15,12 +15,12 @@ function parseNumber(value: string | undefined, fallback: number): number {
 
 export const config = {
   // Public-facing service settings used by the HTTP server and frontend bootstrap payloads.
-  port: parseNumber(process.env.COLLAB_SERVICE_PORT, 3004),
-  frontendOrigin: process.env.COLLAB_FRONTEND_ORIGIN || DEFAULT_FRONTEND_ORIGIN,
+  port: parseNumber(process.env.PORT, 3004),
+  frontendOrigin: process.env.FRONTEND_ORIGIN || DEFAULT_FRONTEND_ORIGIN,
   publicWebsocketUrl:
-    process.env.COLLAB_PUBLIC_WS_URL || `http://localhost:${parseNumber(process.env.COLLAB_SERVICE_PORT, 3004)}`,
-  gracePeriodMs: parseNumber(process.env.COLLAB_GRACE_PERIOD_MS, 30_000),
-  joinTokenTtlMs: parseNumber(process.env.COLLAB_JOIN_TOKEN_TTL_MS, 300_000),
+    process.env.PUBLIC_WS_URL || `http://localhost:${parseNumber(process.env.PORT, 3004)}`,
+  gracePeriodMs: parseNumber(process.env.GRACE_PERIOD_MS, 30_000),
+  joinTokenTtlMs: parseNumber(process.env.JOIN_TOKEN_TTL_MS, 300_000),
   // Supabase is only used here to verify that notification sockets belong to real authenticated users.
   supabase: {
     url: process.env.SUPABASE_URL,

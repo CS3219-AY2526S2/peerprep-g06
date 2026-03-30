@@ -12,7 +12,6 @@
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
-      "@shared/rabbitmq": ["../../shared/rabbitmq/index.ts"],
       "@shared/types": ["../../shared/types.ts"],
       "@shared/constants": ["../../shared/constants.ts"]
     }

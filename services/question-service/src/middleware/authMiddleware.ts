@@ -1,32 +1,35 @@
-import { Request, Response, NextFunction } from 'express'
-import { supabase } from '../lib/supabase'
+import { Request, Response, NextFunction } from 'express';
+import { supabase } from '../lib/supabase';
 
-const ALLOWED_ROLES = ['admin', 'developer']
+const ALLOWED_ROLES = ['admin', 'developer'];
 
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization
+  const authHeader = req.headers.authorization;
 
   if (!authHeader) {
-    return res.status(401).json({ error: 'No authorization header' })
+    return res.status(401).json({ error: 'No authorization header' });
   }
 
-  const token = authHeader.replace('Bearer ', '')
+  const token = authHeader.replace('Bearer ', '');
 
-  const { data: { user }, error } = await supabase.auth.getUser(token)
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
 
   if (error || !user) {
-    return res.status(401).json({ error: 'Invalid token' })
+    return res.status(401).json({ error: 'Invalid token' });
   }
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+    .single();
 
   if (!profile || !ALLOWED_ROLES.includes(profile.role)) {
-    return res.status(403).json({ error: 'Insufficient permissions' })
+    return res.status(403).json({ error: 'Insufficient permissions' });
   }
 
-  next()
-}
+  next();
+};

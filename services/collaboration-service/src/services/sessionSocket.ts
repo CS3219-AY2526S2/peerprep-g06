@@ -22,7 +22,11 @@ import {
   updateParticipantPresence,
   updateSessionStatus,
 } from './sessionPersistence';
-import { applyDocumentUpdate, disposeDocument, getDocumentSyncPayload } from './documentSyncService';
+import {
+  applyDocumentUpdate,
+  disposeDocument,
+  getDocumentSyncPayload,
+} from './documentSyncService';
 import { SessionTransport } from './realtimeTransport';
 import { logger } from '../utils/logger';
 
@@ -65,10 +69,7 @@ function clearScheduledGraceTimeout(sessionId: string, userId: string): void {
   }
 }
 
-async function cleanupEndedSession(
-  transport: SessionTransport,
-  sessionId: string,
-): Promise<void> {
+async function cleanupEndedSession(transport: SessionTransport, sessionId: string): Promise<void> {
   const endedAt = new Date().toISOString();
   const endedPayload: SessionEndedPayload = {
     sessionId,
@@ -163,10 +164,7 @@ async function handleGraceExpiry(
   await endSessionIfComplete(transport, sessionId);
 }
 
-async function handleParticipantLeave(
-  transport: SessionTransport,
-  socket: any,
-): Promise<void> {
+async function handleParticipantLeave(transport: SessionTransport, socket: any): Promise<void> {
   if (socket.data.leaveHandled) {
     return;
   }
@@ -221,7 +219,10 @@ async function handleUnexpectedDisconnect(
 
   const userId = socket.data.userId as string;
   const sessionId = socket.data.sessionId as string;
-  const [session, participants] = await Promise.all([getSession(sessionId), getParticipants(sessionId)]);
+  const [session, participants] = await Promise.all([
+    getSession(sessionId),
+    getParticipants(sessionId),
+  ]);
 
   if (!session || !participants) {
     return;
@@ -367,7 +368,9 @@ export function configureSessionNamespace(
       },
       socket.id,
     );
-    logger.info(`Session socket connected: ${socket.id} for user ${userId} in session ${sessionId}`);
+    logger.info(
+      `Session socket connected: ${socket.id} for user ${userId} in session ${sessionId}`,
+    );
 
     socket.on('doc:update', async (payload: SessionDocumentUpdatePayload) => {
       try {
