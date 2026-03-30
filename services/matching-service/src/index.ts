@@ -37,7 +37,7 @@ io.on('connection', (socket) => {
   registerHandlers(io, socket);
 });
 
-const PORT = process.env.MATCHING_SERVICE_PORT || 3003;
+const PORT = process.env.PORT || 3003;
 
 async function startServer() {
   try {
