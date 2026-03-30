@@ -1,4 +1,4 @@
-import amqp, { ChannelModel, Channel } from 'amqplib';
+import amqp, { Channel } from 'amqplib';
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
 export const EXCHANGE_NAME = 'peerprep';

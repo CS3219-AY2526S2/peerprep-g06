@@ -20,7 +20,7 @@ interface MatchFoundEnvelope {
 }
 
 function parseMatchFoundEvent(content: Buffer): MatchFoundEvent {
-  // Matching publishes an event envelope through the shared RabbitMQ publisher.
+  // Matching publishes a RabbitMQ event envelope when a pair is formed.
   const parsed = JSON.parse(content.toString()) as MatchFoundEnvelope;
   const event = parsed.data?.matchFound;
 

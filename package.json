@@ -3,8 +3,8 @@
     "node": "24.x"
   },
   "scripts": {
-    "build": "npm run build --prefix frontend && npm run build --prefix services/user-service && npm run build --prefix services/question-service && npm run build --prefix services/matching-service && npm run build --prefix services/collaboration-service && npm run build --prefix shared/rabbitmq",
-    "typecheck": "npm run typecheck --prefix frontend && npm run typecheck --prefix services/user-service && npm run typecheck --prefix services/question-service && npm run typecheck --prefix services/matching-service && npm run typecheck --prefix services/collaboration-service && npm run typecheck --prefix shared/rabbitmq",
+    "build": "npm run build --prefix frontend && npm run build --prefix services/user-service && npm run build --prefix services/question-service && npm run build --prefix services/matching-service && npm run build --prefix services/collaboration-service",
+    "typecheck": "npm run typecheck --prefix frontend && npm run typecheck --prefix services/user-service && npm run typecheck --prefix services/question-service && npm run typecheck --prefix services/matching-service && npm run typecheck --prefix services/collaboration-service",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

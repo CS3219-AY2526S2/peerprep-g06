@@ -36,9 +36,7 @@ services:
     command: npm run dev
 
   matching-service:
-    build:
-      context: .
-      dockerfile: services/matching-service/Dockerfile
+    build: ./services/matching-service
     container_name: peerprep-matching-service
     ports:
       - '${MATCHING_SERVICE_PORT:-3003}:3003'
@@ -55,7 +53,6 @@ services:
       - RABBITMQ_URL=amqp://user:root@rabbitmq:5672
     volumes:
       - ./services/matching-service:/app
-      - ./shared:/shared
       - /app/node_modules
     depends_on:
       rabbitmq:
@@ -65,9 +62,7 @@ services:
     command: npm run dev
 
   collaboration-service:
-    build:
-      context: .
-      dockerfile: services/collaboration-service/Dockerfile
+    build: ./services/collaboration-service
     container_name: peerprep-collaboration-service
     ports:
       - '${COLLAB_SERVICE_PORT:-3004}:3004'
@@ -91,7 +86,6 @@ services:
       - NODE_ENV=development
     volumes:
       - ./services/collaboration-service:/app
-      - ./shared:/shared
       - /app/node_modules
     depends_on:
       rabbitmq:

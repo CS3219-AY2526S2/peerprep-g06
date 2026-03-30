@@ -62,11 +62,6 @@ jobs:
             lockfile: services/collaboration-service/package-lock.json
             run_tests: false
             run_coverage: false
-          - name: shared-rabbitmq
-            path: shared/rabbitmq
-            lockfile: shared/rabbitmq/package-lock.json
-            run_tests: false
-            run_coverage: false
 
     steps:
       - name: Check out repository
@@ -113,11 +108,9 @@ jobs:
           - name: question-service
             context: services/question-service
           - name: matching-service
-            context: .
-            dockerfile: services/matching-service/Dockerfile
+            context: services/matching-service
           - name: collaboration-service
-            context: .
-            dockerfile: services/collaboration-service/Dockerfile
+            context: services/collaboration-service
 
     steps:
       - name: Check out repository

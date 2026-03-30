@@ -13,7 +13,7 @@ import { User } from '../types/user';
 import { logger } from '../utils/logger';
 import { getRandomQuestion } from './questionService';
 import Crypto from 'crypto';
-import { publishEvent } from '@shared/rabbitmq';
+import { publishEvent } from '../config/rabbitmq';
 
 export async function findMatch(user: User): Promise<Match | undefined> {
   const queueKey = getQueueKey(user.difficulty, user.language);

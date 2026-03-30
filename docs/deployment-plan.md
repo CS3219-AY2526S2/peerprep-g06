@@ -187,7 +187,6 @@ Today it validates:
   - `question-service`
   - `matching-service`
   - `collaboration-service`
-  - `shared/rabbitmq`
 - `question-service` tests and coverage
 - Docker builds for:
   - `user-service`

@@ -13,7 +13,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@shared/rabbitmq": "file:../../shared/rabbitmq",
+    "amqplib": "^0.10.9",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
@@ -22,7 +22,7 @@
     "yjs": "^13.6.27"
   },
   "devDependencies": {
-    "@types/amqplib": "^0.10.7",
+    "@types/amqplib": "^0.10.8",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.2",

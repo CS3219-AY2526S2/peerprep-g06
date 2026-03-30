@@ -5,8 +5,8 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import { logger } from './utils/logger';
 import { connectRedis, setupRedisSubscription } from './config/redis';
+import { setupTopicExchange } from './config/rabbitmq';
 import { setupSessionManager } from './services/sessionManager';
-import { setupTopicExchange } from '@shared/rabbitmq';
 import { registerHandlers, startMatchmakingInterval } from './handlers/matchingHandler';
 
 // load environment variables
