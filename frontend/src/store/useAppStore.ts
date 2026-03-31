@@ -44,6 +44,7 @@ interface User {
   name: string;
   role: 'user' | 'admin' | 'developer';
   isRequestingAdmin: boolean;
+  isRequestingDemote: boolean;
 }
 
 interface AppStore {

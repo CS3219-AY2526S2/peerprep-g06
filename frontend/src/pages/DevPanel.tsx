@@ -21,8 +21,11 @@ const DevPanel = () => {
   const navigate = useNavigate();
   const { user } = useAppStore();
   const [requests, setRequests] = useState<AdminRequest[]>([]);
+  const [demoteRequests, setDemoteRequests] = useState<AdminRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [demoteLoading, setDemoteLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [demoteError, setDemoteError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,6 +35,7 @@ const DevPanel = () => {
       return;
     }
     fetchRequests();
+    fetchDemoteRequests();
   }, [user]);
 
   const fetchRequests = async () => {
@@ -51,6 +55,26 @@ const DevPanel = () => {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDemoteRequests = async () => {
+    setDemoteLoading(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(USER_ENDPOINTS.getDemoteRequests, {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch demote requests');
+      const data = await response.json();
+      setDemoteRequests(data);
+    } catch (err: any) {
+      setDemoteError(err.message);
+    } finally {
+      setDemoteLoading(false);
     }
   };
 
@@ -94,6 +118,46 @@ const DevPanel = () => {
     }
   };
 
+  const handleApproveDemote = async (requestId: string) => {
+    setActionLoading(requestId);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(USER_ENDPOINTS.approveDemote(requestId), {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (!response.ok) throw new Error('Failed to approve demote request');
+      await fetchDemoteRequests(); // Refresh the demote requests list
+    } catch (err: any) {
+      setDemoteError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectDemote = async (requestId: string) => {
+    setActionLoading(requestId);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(USER_ENDPOINTS.rejectDemote(requestId), {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (!response.ok) throw new Error('Failed to reject demote request');
+      await fetchDemoteRequests(); // Refresh the demote requests list
+    } catch (err: any) {
+      setDemoteError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="absolute inset-0 gradient-glow opacity-20" />
@@ -123,7 +187,9 @@ const DevPanel = () => {
           <h1 className="text-3xl md:text-4xl font-bold mb-2">
             Developer <span className="text-gradient">Panel</span>
           </h1>
-          <p className="text-muted-foreground">Review and manage admin access requests</p>
+          <p className="text-muted-foreground">
+            Review and manage admin access and demote requests
+          </p>
         </div>
 
         {/* Requests */}
@@ -183,6 +249,81 @@ const DevPanel = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => handleReject(request.id)}
+                      disabled={actionLoading === request.id}
+                      className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                    >
+                      {actionLoading === request.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-1" />
+                      )}
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Demote Requests */}
+        <div className="mt-12 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <h2 className="text-xl font-semibold mb-6">Demote Requests</h2>
+          {demoteLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : demoteError ? (
+            <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-center">
+              <p className="text-destructive text-sm">{demoteError}</p>
+            </div>
+          ) : demoteRequests.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-12 text-center">
+              <CheckCircle2 className="h-10 w-10 text-success mx-auto mb-4" />
+              <p className="text-foreground font-medium">All caught up!</p>
+              <p className="text-sm text-muted-foreground mt-1">No pending demote requests.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {demoteRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="rounded-xl border border-border bg-card p-6 flex items-center justify-between gap-4"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-full gradient-primary flex items-center justify-center shadow-glow shrink-0">
+                      <span className="text-sm font-bold text-primary-foreground">
+                        {request.profiles.display_name?.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{request.profiles.display_name}</p>
+                      <p className="text-sm text-muted-foreground">{request.profiles.email}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Requested {new Date(request.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleApproveDemote(request.id)}
+                      disabled={actionLoading === request.id}
+                      className="text-success border-success/50 hover:bg-success/10"
+                    >
+                      {actionLoading === request.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                      )}
+                      Approve
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRejectDemote(request.id)}
                       disabled={actionLoading === request.id}
                       className="text-destructive border-destructive/50 hover:bg-destructive/10"
                     >

@@ -14,14 +14,18 @@ const roleColors = {
 
 const Account = () => {
   const navigate = useNavigate();
-  const { user } = useAppStore();
+  const { user, setUser } = useAppStore();
   const [hasRequested, setHasRequested] = useState(false);
+  const [hasRequestedDemote, setHasRequestedDemote] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [demoteLoading, setDemoteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoteError, setDemoteError] = useState<string | null>(null);
 
   // Check if user already requested
   useEffect(() => {
     setHasRequested(user?.isRequestingAdmin ?? false);
+    setHasRequestedDemote(user?.isRequestingDemote ?? false);
   }, [user]);
 
   const handleRequestAdmin = async () => {
@@ -47,10 +51,44 @@ const Account = () => {
       }
 
       setHasRequested(true);
+      // Update user in store
+      setUser({ ...user!, isRequestingAdmin: true });
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRequestDemote = async () => {
+    setDemoteLoading(true);
+    setDemoteError(null);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(USER_ENDPOINTS.requestDemote(user?.id!), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: user?.id }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error);
+      }
+
+      setHasRequestedDemote(true);
+      // Update user in store
+      setUser({ ...user!, isRequestingDemote: true });
+    } catch (err: any) {
+      setDemoteError(err.message);
+    } finally {
+      setDemoteLoading(false);
     }
   };
 
@@ -151,6 +189,40 @@ const Account = () => {
                   Request Admin
                 </Button>
                 {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Demote to User */}
+        {user?.role === 'admin' && (
+          <div
+            className="mt-6 rounded-xl border border-border bg-card p-6 animate-fade-in"
+            style={{ animationDelay: '0.2s' }}
+          >
+            <h2 className="text-lg font-semibold mb-1">Request Demote to User</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              No longer need admin privileges? Submit a request to the development team to demote
+              yourself back to a regular user.
+            </p>
+
+            {hasRequestedDemote ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                Request submitted — we'll review it shortly.
+              </div>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRequestDemote}
+                  disabled={demoteLoading}
+                >
+                  {demoteLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Request Demote
+                </Button>
+                {demoteError && <p className="text-sm text-destructive mt-2">{demoteError}</p>}
               </>
             )}
           </div>
