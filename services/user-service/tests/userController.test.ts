@@ -1,6 +1,11 @@
 import { Request, Response } from 'express';
-import { UserController } from '../src/controllers/userController';
 import { vi, describe, it, expect } from 'vitest';
+
+vi.mock('../src/lib/supabase', () => ({
+  supabase: { from: vi.fn() },
+}));
+
+import { UserController } from '../src/controllers/userController';
 
 const mockRes = () => {
   const res = {} as Response;
