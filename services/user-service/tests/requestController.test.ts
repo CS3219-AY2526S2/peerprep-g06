@@ -26,8 +26,11 @@ describe('RequestController', () => {
     it('should return pending admin requests', async () => {
       const mockData = [{ id: 1, status: 'pending' }];
       mockFrom.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ data: mockData, error: null }),
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: mockData, error: null }),
+          }),
+        }),
       });
       const req = {} as Request;
       const res = mockRes();
@@ -45,8 +48,11 @@ describe('RequestController', () => {
         },
       ];
       mockFrom.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ data: mockData, error: null }),
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: mockData, error: null }),
+          }),
+        }),
       });
       const req = {} as Request;
       const res = mockRes();
@@ -56,8 +62,11 @@ describe('RequestController', () => {
 
     it('should handle DB errors with 500', async () => {
       mockFrom.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ data: null, error: new Error('DB error') }),
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: null, error: new Error('DB error') }),
+          }),
+        }),
       });
       const req = {} as Request;
       const res = mockRes();

@@ -7,7 +7,7 @@ vi.mock('../src/middleware/authMiddleware', () => ({
 }));
 
 vi.mock('../src/controllers/userController', () => ({
-  UserController: { healthCheck: vi.fn() },
+  UserController: { healthCheck: vi.fn(), getProfile: vi.fn() },
 }));
 
 vi.mock('../src/controllers/requestController', () => ({
@@ -16,6 +16,10 @@ vi.mock('../src/controllers/requestController', () => ({
     getAdminRequests: vi.fn(),
     approveAdmin: vi.fn(),
     rejectAdmin: vi.fn(),
+    requestDemote: vi.fn(),
+    getDemoteRequests: vi.fn(),
+    approveDemote: vi.fn(),
+    rejectDemote: vi.fn(),
   },
 }));
 
