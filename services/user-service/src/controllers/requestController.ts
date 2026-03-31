@@ -9,6 +9,7 @@ export class RequestController {
         .select(
           `
         id,
+        type,
         status,
         created_at,
         profiles (
@@ -18,7 +19,8 @@ export class RequestController {
         )
       `,
         )
-        .eq('status', 'pending'); // ← only show pending ones
+        .eq('status', 'pending')
+        .eq('type', 'promote'); // Only show promotion requests
 
       if (error) throw error;
 
@@ -43,6 +45,7 @@ export class RequestController {
         .select('id')
         .eq('user_id', user_id)
         .eq('status', 'pending')
+        .eq('type', 'promote')
         .single();
 
       if (existing.data) {
@@ -50,7 +53,12 @@ export class RequestController {
       }
 
       // Insert into admin_requests
-      const { error: requestError } = await supabase.from('admin_requests').insert([{ user_id }]);
+      const { error: requestError } = await supabase.from('admin_requests').insert([
+        {
+          user_id,
+          type: 'promote',
+        },
+      ]);
 
       if (requestError) throw requestError;
 
@@ -135,6 +143,159 @@ export class RequestController {
         .from('profiles')
         .update({ is_requesting_admin: false })
         .eq('id', request.user_id); // ← now has user_id
+
+      if (profileError) throw profileError;
+
+      res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error('Server error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async getDemoteRequests(req: Request, res: Response) {
+    try {
+      const { data, error } = await supabase
+        .from('admin_requests')
+        .select(
+          `
+        id,
+        type,
+        status,
+        created_at,
+        profiles (
+          id,
+          email,
+          display_name
+        )
+      `,
+        )
+        .eq('status', 'pending')
+        .eq('type', 'demote'); // Only show demotion requests
+
+      if (error) throw error;
+
+      res.json(data);
+    } catch (err: any) {
+      console.error('Server error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async requestDemote(req: Request, res: Response) {
+    try {
+      const { id: user_id } = req.params;
+
+      if (!user_id) {
+        return res.status(400).json({ error: 'Missing user_id' });
+      }
+
+      // Check if already requested
+      const existing = await supabase
+        .from('admin_requests')
+        .select('id')
+        .eq('user_id', user_id)
+        .eq('status', 'pending')
+        .eq('type', 'demote')
+        .single();
+
+      if (existing.data) {
+        return res.status(400).json({ error: 'Already requested demote' });
+      }
+
+      // Insert into admin_requests
+      const { error: requestError } = await supabase.from('admin_requests').insert([
+        {
+          user_id,
+          type: 'demote',
+        },
+      ]);
+
+      if (requestError) throw requestError;
+
+      // Update profiles
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_requesting_demote: true })
+        .eq('id', user_id);
+
+      if (profileError) throw profileError;
+
+      res.status(201).json({ success: true });
+    } catch (err: any) {
+      console.error('Server error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async approveDemote(req: Request, res: Response) {
+    try {
+      const { id: request_id } = req.params;
+
+      // Get the user_id from the request
+      const { data: request, error: fetchError } = await supabase
+        .from('admin_requests')
+        .select('user_id')
+        .eq('id', request_id)
+        .eq('type', 'demote') // Ensure it's a demote request
+        .single();
+
+      if (fetchError || !request) {
+        return res.status(404).json({ error: 'Request not found' });
+      }
+
+      // Update admin_requests status
+      const { error: requestError } = await supabase
+        .from('admin_requests')
+        .update({ status: 'approved' })
+        .eq('id', request_id);
+
+      if (requestError) throw requestError;
+
+      // Update profiles role to user
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ role: 'user', is_requesting_demote: false })
+        .eq('id', request.user_id);
+
+      if (profileError) throw profileError;
+
+      res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error('Server error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async rejectDemote(req: Request, res: Response) {
+    try {
+      const { id: request_id } = req.params;
+
+      // Get user_id first
+      const { data: request, error: fetchError } = await supabase
+        .from('admin_requests')
+        .select('user_id')
+        .eq('id', request_id)
+        .eq('type', 'demote') // Ensure it's a demote request
+        .single();
+
+      if (fetchError || !request) {
+        return res.status(404).json({ error: 'Request not found' });
+      }
+
+      // Update request status
+      const { error: requestError } = await supabase
+        .from('admin_requests')
+        .update({ status: 'rejected' })
+        .eq('id', request_id);
+
+      if (requestError) throw requestError;
+
+      // Update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_requesting_demote: false })
+        .eq('id', request.user_id);
 
       if (profileError) throw profileError;
 
