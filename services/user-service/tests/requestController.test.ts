@@ -114,7 +114,7 @@ describe('RequestController', () => {
       });
       await RequestController.requestAdmin(req, res);
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Already requested admin access' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'Already requested promote' });
     });
 
     it('should return 500 if insert into admin_requests fails', async () => {
