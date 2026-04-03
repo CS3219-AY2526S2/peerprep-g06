@@ -18,6 +18,7 @@ import {
   getSession,
   getStoredJoinToken,
   hashJoinToken,
+  listGracePeriods,
   saveGracePeriod,
   updateParticipantPresence,
   updateSessionStatus,
@@ -29,6 +30,7 @@ import {
 } from './documentSyncService';
 import { SessionTransport } from './realtimeTransport';
 import { logger } from '../utils/logger';
+import { StoredJoinToken } from '../types/session';
 
 type SessionNamespace = Namespace<
   CollaborationSessionSocketClientToServerEvents,
@@ -67,6 +69,21 @@ function clearScheduledGraceTimeout(sessionId: string, userId: string): void {
     clearTimeout(existingTimeout);
     graceTimeouts.delete(timeoutKey);
   }
+}
+
+export function isStoredJoinTokenValid(
+  sessionId: string,
+  userId: string,
+  providedJoinToken: string,
+  storedJoinToken: StoredJoinToken,
+  nowIso = new Date().toISOString(),
+): boolean {
+  return (
+    storedJoinToken.claims.sessionId === sessionId &&
+    storedJoinToken.claims.userId === userId &&
+    storedJoinToken.claims.expiresAt > nowIso &&
+    hashJoinToken(providedJoinToken) === storedJoinToken.tokenHash
+  );
 }
 
 async function cleanupEndedSession(transport: SessionTransport, sessionId: string): Promise<void> {
@@ -162,6 +179,30 @@ async function handleGraceExpiry(
   });
 
   await endSessionIfComplete(transport, sessionId);
+}
+
+export async function recoverScheduledGracePeriods(transport: SessionTransport): Promise<void> {
+  const gracePeriods = await listGracePeriods();
+  let scheduledCount = 0;
+
+  for (const gracePeriod of gracePeriods) {
+    const session = await getSession(gracePeriod.sessionId);
+    if (!session || session.status === 'ended') {
+      await clearGracePeriod(gracePeriod.sessionId, gracePeriod.userId);
+      continue;
+    }
+
+    const remainingMs = new Date(gracePeriod.expiresAt).getTime() - Date.now();
+    if (remainingMs <= 0) {
+      await handleGraceExpiry(transport, gracePeriod.sessionId, gracePeriod.userId);
+      continue;
+    }
+
+    scheduleGraceExpiry(transport, gracePeriod.sessionId, gracePeriod.userId, remainingMs);
+    scheduledCount += 1;
+  }
+
+  logger.info(`Recovered ${scheduledCount} active grace-period timers`);
 }
 
 async function handleParticipantLeave(transport: SessionTransport, socket: any): Promise<void> {
@@ -302,15 +343,7 @@ export function configureSessionNamespace(
         return next(new Error('User has already left this session'));
       }
 
-      if (
-        storedJoinToken.claims.sessionId !== sessionId ||
-        storedJoinToken.claims.userId !== user.id ||
-        storedJoinToken.claims.expiresAt <= new Date().toISOString()
-      ) {
-        return next(new Error('Join token is invalid or expired'));
-      }
-
-      if (hashJoinToken(joinToken) !== storedJoinToken.tokenHash) {
+      if (!isStoredJoinTokenValid(sessionId, user.id, joinToken, storedJoinToken)) {
         return next(new Error('Join token does not match this session'));
       }
 

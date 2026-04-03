@@ -36,7 +36,7 @@ function createJoinToken(
   return { token, claims };
 }
 
-function buildSessionSeed(event: MatchFoundEvent): PersistedSessionSeed {
+export function buildSessionSeed(event: MatchFoundEvent): PersistedSessionSeed {
   // The seed is the full "first write" for a collaboration session:
   // metadata, participants, question, initial document, and per-user join tokens.
   const createdAt = new Date().toISOString();

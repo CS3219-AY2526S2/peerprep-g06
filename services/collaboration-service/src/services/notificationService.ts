@@ -54,6 +54,9 @@ export async function queueSessionReadyNotification(payload: SessionReadyPayload
     createdAt: new Date().toISOString(),
     expiresAt: buildDeliveryExpiry(),
   });
+  logger.info(
+    `Queued session-ready for user ${payload.userId} and session ${payload.sessionId}`,
+  );
 }
 
 export async function deliverPendingNotifications(

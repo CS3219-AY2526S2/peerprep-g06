@@ -19,7 +19,7 @@ interface MatchFoundEnvelope {
   timestamp?: number;
 }
 
-function parseMatchFoundEvent(content: Buffer): MatchFoundEvent {
+export function parseMatchFoundEvent(content: Buffer): MatchFoundEvent {
   // Matching publishes a RabbitMQ event envelope when a pair is formed.
   const parsed = JSON.parse(content.toString()) as MatchFoundEnvelope;
   const event = parsed.data?.matchFound;
