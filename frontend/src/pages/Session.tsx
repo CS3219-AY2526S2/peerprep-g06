@@ -1,16 +1,23 @@
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { CollaborativeMonacoEditor } from '@/components/CollaborativeMonacoEditor';
 import { useCollabSession } from '@/hooks/useCollabSession';
 import { useAppStore } from '@/store/useAppStore';
 
 const Session = () => {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
-  const { pendingSession, collabSessionStatus, collabError, setCurrentState, clearPendingSession } =
-    useAppStore();
+  const {
+    pendingSession,
+    collabSessionStatus,
+    collabError,
+    setCurrentState,
+    clearPendingSession,
+  } = useAppStore();
 
   const {
+    sharedDoc,
     joinedSession,
     participantStatuses,
     latestDocSync,
@@ -24,12 +31,13 @@ const Session = () => {
 
   useEffect(() => {
     if (!pendingSession || !sessionId || pendingSession.sessionId !== sessionId) {
+      clearPendingSession();
       navigate('/match', { replace: true });
       return;
     }
 
     setCurrentState('session');
-  }, [navigate, pendingSession, sessionId, setCurrentState]);
+  }, [clearPendingSession, navigate, pendingSession, sessionId, setCurrentState]);
 
   useEffect(() => {
     if (!sessionEnded) {
@@ -54,15 +62,17 @@ const Session = () => {
     navigate('/match', { replace: true });
   };
 
+  const participantCards = Object.values(participantStatuses);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="absolute inset-0 gradient-glow opacity-20" />
 
-      <main className="relative z-10 container mx-auto px-6 py-12 max-w-6xl space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <main className="relative z-10 container mx-auto px-6 py-12 max-w-7xl space-y-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h1 className="text-3xl font-bold">
-              Collaboration <span className="text-gradient">Session Test</span>
+              Collaboration <span className="text-gradient">Session</span>
             </h1>
             <p className="text-muted-foreground mt-2">
               Session {pendingSession.sessionId} / {pendingSession.language}
@@ -81,139 +91,125 @@ const Session = () => {
           </div>
         </div>
 
-        {sessionEnded && (
-          <div className="rounded-xl border border-primary/30 bg-primary/10 p-4">
-            <p className="font-medium text-foreground">Session ended</p>
-            <p className="text-sm text-muted-foreground">
-              All participants have left. Returning to matching...
-            </p>
-          </div>
-        )}
-
-        {collabError && (
-          <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-500">
-            {collabError}
-          </div>
-        )}
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">Question details</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Payload from collaboration service session-ready
+              <p className="text-sm font-medium text-foreground">
+                Session socket: <span className="text-primary">{collabSessionStatus}</span>
               </p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-lg font-semibold">{pendingSession.question.title}</p>
               <p className="text-sm text-muted-foreground">
-                {pendingSession.question.difficulty} / {pendingSession.question.topic}
-              </p>
-              <p className="text-sm leading-6 whitespace-pre-wrap">
-                {pendingSession.question.description}
-              </p>
-            </div>
-            <div className="rounded-lg bg-background/80 p-4 text-sm">
-              <p>
-                <span className="font-medium">Current user:</span> {pendingSession.userId}
-              </p>
-              <p>
-                <span className="font-medium">WebSocket URL:</span> {pendingSession.websocketUrl}
-              </p>
-              <p>
-                <span className="font-medium">Grace period:</span> {pendingSession.gracePeriodMs}ms
+                {joinedSession
+                  ? `Joined as ${joinedSession.userId} with ${joinedSession.participantIds.length} participants`
+                  : 'Waiting for session:joined'}
               </p>
             </div>
-          </section>
+            <div className="text-sm text-muted-foreground">
+              Grace period: {pendingSession.gracePeriodMs}ms
+            </div>
+          </div>
+          {collabError && (
+            <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
+              {collabError}
+            </p>
+          )}
+          {sessionEnded && (
+            <p className="mt-3 rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">
+              Session ended. Returning to matching...
+            </p>
+          )}
+        </div>
 
-          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
-            <div>
-              <h2 className="text-xl font-semibold">Connection state</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Session join and socket lifecycle
-              </p>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-lg bg-background/80 p-4 text-sm">
-                <p className="font-medium">Session socket</p>
-                <p className="text-muted-foreground mt-1">{collabSessionStatus}</p>
-              </div>
-              <div className="rounded-lg bg-background/80 p-4 text-sm">
-                <p className="font-medium">Join state</p>
-                <p className="text-muted-foreground mt-1">
-                  {joinedSession
-                    ? `Joined as ${joinedSession.userId}`
-                    : 'Waiting for session:joined'}
+        <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+          <aside className="space-y-6">
+            <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
+              <div>
+                <h2 className="text-xl font-semibold">Question</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Session payload from collaboration service
                 </p>
               </div>
-            </div>
-            {joinedSession && (
-              <pre className="overflow-x-auto rounded-lg bg-background/80 p-4 text-xs">
-                {JSON.stringify(joinedSession, null, 2)}
-              </pre>
-            )}
-          </section>
+              <div className="space-y-2">
+                <p className="text-lg font-semibold">{pendingSession.question.title}</p>
+                <p className="text-sm text-muted-foreground">
+                  {pendingSession.question.difficulty} / {pendingSession.question.topic}
+                </p>
+                <p className="text-sm leading-6 whitespace-pre-wrap">
+                  {pendingSession.question.description}
+                </p>
+              </div>
+            </section>
 
-          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
-            <div>
-              <h2 className="text-xl font-semibold">Participant statuses</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Live participant:status events from the session room
-              </p>
-            </div>
-            {Object.keys(participantStatuses).length === 0 ? (
-              <p className="text-sm text-muted-foreground">No participant status updates yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {Object.values(participantStatuses).map((participant) => (
-                  <div key={participant.userId} className="rounded-lg bg-background/80 p-4 text-sm">
-                    <p className="font-medium">{participant.userId}</p>
-                    <p className="text-muted-foreground">
-                      {participant.status} / {participant.reason}
-                    </p>
-                    <p className="text-muted-foreground">{participant.at}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
-            <div>
-              <h2 className="text-xl font-semibold">Document sync and debug</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Latest doc:sync, doc:update, and session logs
-              </p>
-            </div>
-            <div className="grid gap-4">
+            <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
               <div>
-                <p className="text-sm font-medium mb-2">Latest doc:sync</p>
-                <pre className="overflow-x-auto rounded-lg bg-background/80 p-4 text-xs">
-                  {JSON.stringify(latestDocSync, null, 2)}
-                </pre>
+                <h2 className="text-xl font-semibold">Participants</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Live participant:status updates
+                </p>
               </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Latest doc:update</p>
-                <pre className="overflow-x-auto rounded-lg bg-background/80 p-4 text-xs">
-                  {JSON.stringify(latestDocUpdate, null, 2)}
-                </pre>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Event log</p>
-                <div className="max-h-80 overflow-y-auto rounded-lg bg-background/80 p-4 space-y-3">
-                  {eventLog.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No events yet.</p>
-                  ) : (
-                    eventLog.map((entry) => (
-                      <div key={entry.id} className="text-sm">
-                        <p className="font-medium">{entry.event}</p>
-                        <p className="text-muted-foreground">{entry.summary}</p>
-                        <p className="text-xs text-muted-foreground">{entry.at}</p>
-                      </div>
-                    ))
-                  )}
+              {participantCards.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No participant status updates yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {participantCards.map((participant) => (
+                    <div
+                      key={participant.userId}
+                      className="rounded-lg border border-border bg-background/80 p-4 text-sm"
+                    >
+                      <p className="font-medium">{participant.userId}</p>
+                      <p className="text-muted-foreground">
+                        {participant.status} / {participant.reason}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{participant.at}</p>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
+            </section>
+          </aside>
+
+          <section className="space-y-4">
+            <CollaborativeMonacoEditor
+              doc={sharedDoc}
+              language={pendingSession.language}
+              readOnly={!sharedDoc}
+            />
+
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <details>
+                <summary className="cursor-pointer text-sm font-medium text-foreground">
+                  Debug panel
+                </summary>
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-medium mb-2">Latest doc:sync</p>
+                    <pre className="overflow-x-auto rounded-lg bg-background/80 p-4 text-xs">
+                      {JSON.stringify(latestDocSync, null, 2)}
+                    </pre>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-2">Latest doc:update</p>
+                    <pre className="overflow-x-auto rounded-lg bg-background/80 p-4 text-xs">
+                      {JSON.stringify(latestDocUpdate, null, 2)}
+                    </pre>
+                  </div>
+                  <div className="lg:col-span-2">
+                    <p className="text-sm font-medium mb-2">Event log</p>
+                    <div className="max-h-72 overflow-y-auto rounded-lg bg-background/80 p-4 space-y-3">
+                      {eventLog.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No events yet.</p>
+                      ) : (
+                        eventLog.map((entry) => (
+                          <div key={entry.id} className="text-sm">
+                            <p className="font-medium">{entry.event}</p>
+                            <p className="text-muted-foreground">{entry.summary}</p>
+                            <p className="text-xs text-muted-foreground">{entry.at}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </details>
             </div>
           </section>
         </div>
