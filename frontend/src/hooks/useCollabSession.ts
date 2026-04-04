@@ -5,30 +5,13 @@ import {
   createSessionSocket,
   getCollabAccessToken,
   ParticipantStatusPayload,
-  SessionDocumentSyncPayload,
   SessionEndedPayload,
   SessionJoinedPayload,
   SessionSocket,
 } from '@/lib/collab';
 import { useAppStore } from '@/store/useAppStore';
 
-interface SessionEventLogEntry {
-  id: string;
-  at: string;
-  event: string;
-  summary: string;
-}
-
 const REMOTE_UPDATE_ORIGINS = new Set(['remote', 'remote-sync']);
-
-function buildLogEntry(event: string, summary: string): SessionEventLogEntry {
-  return {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    at: new Date().toISOString(),
-    event,
-    summary,
-  };
-}
 
 function encodeUpdateBase64(update: Uint8Array): string {
   let binary = '';
@@ -48,6 +31,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
   const reconnectAttemptRef = useRef(0);
   const sharedDocRef = useRef<Y.Doc | null>(null);
   const docObserverRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
+  const isLeavingRef = useRef(false);
   const { setCollabSessionStatus, setCollabError } = useAppStore();
 
   const [sharedDoc, setSharedDoc] = useState<Y.Doc | null>(null);
@@ -55,28 +39,21 @@ export function useCollabSession(session: SessionReadyPayload | null) {
   const [participantStatuses, setParticipantStatuses] = useState<
     Record<string, ParticipantStatusPayload>
   >({});
-  const [latestDocSync, setLatestDocSync] = useState<SessionDocumentSyncPayload | null>(null);
-  const [latestDocUpdate, setLatestDocUpdate] = useState<
-    (SessionDocumentSyncPayload & { userId: string }) | null
-  >(null);
   const [sessionEnded, setSessionEnded] = useState<SessionEndedPayload | null>(null);
-  const [eventLog, setEventLog] = useState<SessionEventLogEntry[]>([]);
-
-  const appendLog = useCallback((event: string, summary: string) => {
-    setEventLog((previous) => [buildLogEntry(event, summary), ...previous].slice(0, 25));
-  }, []);
 
   const disposeSharedDoc = useCallback(() => {
-    if (sharedDocRef.current) {
-      if (docObserverRef.current) {
-        sharedDocRef.current.off('update', docObserverRef.current);
-      }
-
-      sharedDocRef.current.destroy();
-      sharedDocRef.current = null;
-      docObserverRef.current = null;
-      setSharedDoc(null);
+    if (!sharedDocRef.current) {
+      return;
     }
+
+    if (docObserverRef.current) {
+      sharedDocRef.current.off('update', docObserverRef.current);
+    }
+
+    sharedDocRef.current.destroy();
+    sharedDocRef.current = null;
+    docObserverRef.current = null;
+    setSharedDoc(null);
   }, []);
 
   const createSharedDoc = useCallback(() => {
@@ -93,7 +70,6 @@ export function useCollabSession(session: SessionReadyPayload | null) {
       socketRef.current.emit('doc:update', {
         update: encodeUpdateBase64(update),
       });
-      appendLog('doc:update:local', `Sent local update (${update.byteLength} bytes)`);
     };
 
     doc.on('update', onUpdate);
@@ -102,25 +78,25 @@ export function useCollabSession(session: SessionReadyPayload | null) {
     setSharedDoc(doc);
 
     return doc;
-  }, [appendLog]);
+  }, []);
 
-  const replaceSharedDocFromSync = useCallback(
-    (payload: SessionDocumentSyncPayload) => {
+  const syncSharedDoc = useCallback(
+    (encodedUpdate: string) => {
       disposeSharedDoc();
 
       const doc = createSharedDoc();
-      Y.applyUpdate(doc, decodeUpdateBase64(payload.update), 'remote-sync');
-      setLatestDocSync(payload);
-      appendLog('doc:sync', `Loaded shared document snapshot at ${payload.updatedAt}`);
+      Y.applyUpdate(doc, decodeUpdateBase64(encodedUpdate), 'remote-sync');
     },
-    [appendLog, createSharedDoc, disposeSharedDoc],
+    [createSharedDoc, disposeSharedDoc],
   );
 
   const disconnect = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
+    if (!socketRef.current) {
+      return;
     }
+
+    socketRef.current.disconnect();
+    socketRef.current = null;
   }, []);
 
   const connect = useCallback(async () => {
@@ -131,11 +107,13 @@ export function useCollabSession(session: SessionReadyPayload | null) {
     disconnect();
     reconnectAttemptRef.current += 1;
     const attempt = reconnectAttemptRef.current;
+    isLeavingRef.current = false;
 
+    setJoinedSession(null);
+    setParticipantStatuses({});
     setSessionEnded(null);
     setCollabSessionStatus('connecting');
     setCollabError(null);
-    appendLog('session:connect', `Connecting to session ${session.sessionId}`);
 
     try {
       const accessToken = await getCollabAccessToken();
@@ -148,28 +126,23 @@ export function useCollabSession(session: SessionReadyPayload | null) {
 
       socket.on('connect', () => {
         setCollabSessionStatus('connected');
-        appendLog('socket:connect', `Connected with socket ${socket.id}`);
+        setCollabError(null);
       });
 
       socket.on('session:joined', (payload) => {
         setJoinedSession(payload);
-        appendLog('session:joined', `Joined as ${payload.userId}`);
       });
 
       socket.on('session:error', ({ message }) => {
         setCollabSessionStatus('error');
         setCollabError(message);
-        appendLog('session:error', message);
       });
 
       socket.on('doc:sync', (payload) => {
-        replaceSharedDocFromSync(payload);
+        syncSharedDoc(payload.update);
       });
 
       socket.on('doc:update', (payload) => {
-        setLatestDocUpdate(payload);
-        appendLog('doc:update:remote', `Received document update from ${payload.userId}`);
-
         if (!sharedDocRef.current) {
           const doc = createSharedDoc();
           Y.applyUpdate(doc, decodeUpdateBase64(payload.update), 'remote');
@@ -184,45 +157,58 @@ export function useCollabSession(session: SessionReadyPayload | null) {
           ...previous,
           [payload.userId]: payload,
         }));
-        appendLog(
-          'participant:status',
-          `${payload.userId} is ${payload.status} (${payload.reason})`,
-        );
       });
 
       socket.on('session:ended', (payload) => {
         setSessionEnded(payload);
-        appendLog('session:ended', `Session ended at ${payload.endedAt}`);
+        setCollabSessionStatus('disconnected');
       });
 
       socket.on('connect_error', (error) => {
         setCollabSessionStatus('error');
-        setCollabError(error.message || 'Failed to connect to session');
-        appendLog('connect_error', error.message || 'Failed to connect to session');
+        setCollabError(error.message || 'Unable to join your collaboration session');
       });
 
       socket.on('disconnect', (reason) => {
-        setCollabSessionStatus('disconnected');
-        appendLog('socket:disconnect', reason);
+        if (isLeavingRef.current || reason === 'io client disconnect') {
+          setCollabSessionStatus('disconnected');
+          return;
+        }
+
+        setCollabSessionStatus('reconnecting');
+        setCollabError(null);
+      });
+
+      socket.io.on('reconnect_attempt', () => {
+        setCollabSessionStatus('reconnecting');
+      });
+
+      socket.io.on('reconnect', () => {
+        setCollabSessionStatus('connected');
+        setCollabError(null);
+      });
+
+      socket.io.on('reconnect_error', () => {
+        setCollabSessionStatus('reconnecting');
+      });
+
+      socket.io.on('reconnect_failed', () => {
+        setCollabSessionStatus('error');
+        setCollabError('Unable to reconnect to your session. Please leave and try again.');
       });
     } catch (error) {
       setCollabSessionStatus('error');
       setCollabError(
         error instanceof Error ? error.message : 'Failed to prepare session connection',
       );
-      appendLog(
-        'session:connect_error',
-        error instanceof Error ? error.message : 'Failed to prepare session connection',
-      );
     }
   }, [
-    appendLog,
     createSharedDoc,
     disconnect,
-    replaceSharedDocFromSync,
     session,
     setCollabError,
     setCollabSessionStatus,
+    syncSharedDoc,
   ]);
 
   useEffect(() => {
@@ -233,35 +219,23 @@ export function useCollabSession(session: SessionReadyPayload | null) {
     void connect();
 
     return () => {
+      isLeavingRef.current = true;
       disconnect();
       disposeSharedDoc();
     };
   }, [connect, disconnect, disposeSharedDoc, session]);
 
-  const reconnect = useCallback(() => {
-    void connect();
-  }, [connect]);
-
   const leaveSession = useCallback(() => {
-    appendLog('session:leave', 'Leaving session');
+    isLeavingRef.current = true;
     socketRef.current?.emit('session:leave');
     disconnect();
-  }, [appendLog, disconnect]);
-
-  const clearEventLog = useCallback(() => {
-    setEventLog([]);
-  }, []);
+  }, [disconnect]);
 
   return {
     sharedDoc,
     joinedSession,
     participantStatuses,
-    latestDocSync,
-    latestDocUpdate,
     sessionEnded,
-    eventLog,
-    reconnect,
     leaveSession,
-    clearEventLog,
   };
 }

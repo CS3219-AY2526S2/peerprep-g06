@@ -55,6 +55,11 @@ export function createSessionSocket(
 ): SessionSocket {
   return io(`${COLLAB_WS_URL}/session`, {
     transports: ['websocket'],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 4000,
+    timeout: 10000,
     auth: {
       token: accessToken,
       sessionId,

@@ -3,7 +3,13 @@ import { SessionReadyPayload } from '../../../shared/types';
 
 export type AppState = 'landing' | 'login' | 'signup' | 'matching' | 'queue' | 'session';
 export type Difficulty = 'easy' | 'medium' | 'hard';
-export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
+export type ConnectionStatus =
+  | 'idle'
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected'
+  | 'error';
 
 const PENDING_SESSION_STORAGE_KEY = 'peerprep.pendingSession';
 
