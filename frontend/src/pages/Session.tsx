@@ -55,8 +55,7 @@ function getConnectionPresentation(
     case 'grace-expired':
       return {
         label: 'Reconnect window expired',
-        message:
-          'You were disconnected too long and your reserved place in this session expired.',
+        message: 'You were disconnected too long and your reserved place in this session expired.',
         tone: 'error',
         showExitAction: true,
       };
@@ -141,13 +140,8 @@ const Session = () => {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
   const { user } = useAuth();
-  const {
-    pendingSession,
-    collabSessionStatus,
-    collabError,
-    setCurrentState,
-    clearPendingSession,
-  } = useAppStore();
+  const { pendingSession, collabSessionStatus, collabError, setCurrentState, clearPendingSession } =
+    useAppStore();
 
   const { sharedDoc, joinedSession, participantStatuses, sessionEnded, leaveSession } =
     useCollabSession(pendingSession);
@@ -182,11 +176,13 @@ const Session = () => {
   }, [clearPendingSession, navigate, sessionEnded]);
 
   const participantIds = Array.from(
-    new Set([
-      pendingSession?.userId,
-      ...(joinedSession?.participantIds ?? []),
-      ...Object.keys(participantStatuses),
-    ].filter((value): value is string => Boolean(value))),
+    new Set(
+      [
+        pendingSession?.userId,
+        ...(joinedSession?.participantIds ?? []),
+        ...Object.keys(participantStatuses),
+      ].filter((value): value is string => Boolean(value)),
+    ),
   );
 
   if (!pendingSession || !sessionId || pendingSession.sessionId !== sessionId) {
@@ -289,11 +285,11 @@ const Session = () => {
                       ? 'Reconnect window expired'
                       : collabSessionStatus === 'reconnect-failed'
                         ? 'Unable to reconnect'
-                      : collabSessionStatus === 'rejoined-awaiting-sync'
-                        ? 'Restoring your shared editor...'
-                    : editorReadOnly
-                      ? 'Reconnecting and syncing shared editor...'
-                      : 'Live shared editor'
+                        : collabSessionStatus === 'rejoined-awaiting-sync'
+                          ? 'Restoring your shared editor...'
+                          : editorReadOnly
+                            ? 'Reconnecting and syncing shared editor...'
+                            : 'Live shared editor'
                 }
               />
             </section>

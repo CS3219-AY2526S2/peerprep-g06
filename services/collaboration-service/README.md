@@ -132,7 +132,7 @@ Top to bottom:
 4. `scripts.build` compiles `src/` into `dist/`.
 5. `scripts.test` runs the minimal node-based automated tests.
 6. `scripts.start` runs the compiled JS output.
-5. `dependencies`:
+7. `dependencies`:
    - `amqplib`: RabbitMQ client
    - `cors`: Express CORS support
    - `dotenv`: environment loading
@@ -140,7 +140,7 @@ Top to bottom:
    - `redis`: Redis client
    - `socket.io`: realtime transport
    - `yjs`: CRDT document engine
-6. `devDependencies` are the TypeScript/dev-only packages.
+8. `devDependencies` are the TypeScript/dev-only packages.
 
 ### 5.2 `Dockerfile`
 
