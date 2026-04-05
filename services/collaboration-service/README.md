@@ -106,11 +106,11 @@ Required infrastructure:
 Required environment variables are documented in `.env.example`.
 The current service-specific names are:
 
-- `COLLAB_SERVICE_PORT`
-- `COLLAB_FRONTEND_ORIGIN`
-- `COLLAB_PUBLIC_WS_URL`
-- `COLLAB_GRACE_PERIOD_MS`
-- `COLLAB_JOIN_TOKEN_TTL_MS`
+- `PORT`
+- `FRONTEND_ORIGIN`
+- `PUBLIC_WS_URL`
+- `GRACE_PERIOD_MS`
+- `JOIN_TOKEN_TTL_MS`
 
 ## 5. File-By-File Walkthrough
 
@@ -170,11 +170,11 @@ Purpose:
 
 Variables:
 
-- `COLLAB_SERVICE_PORT`
-- `COLLAB_FRONTEND_ORIGIN`
-- `COLLAB_PUBLIC_WS_URL`
-- `COLLAB_GRACE_PERIOD_MS`
-- `COLLAB_JOIN_TOKEN_TTL_MS`
+- `PORT`
+- `FRONTEND_ORIGIN`
+- `PUBLIC_WS_URL`
+- `GRACE_PERIOD_MS`
+- `JOIN_TOKEN_TTL_MS`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_KEY`
 - `RABBITMQ_URL`
