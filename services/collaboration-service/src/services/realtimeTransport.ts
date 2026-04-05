@@ -25,7 +25,7 @@ export interface NotificationTransport {
 
 export interface SessionTransport {
   joinSessionRoom(socket: any, sessionId: string): void;
-  disconnectSocket(socketId?: string): void;
+  disconnectSocket(socketId?: string, reasonCode?: string): void;
   emitDocumentSync(socket: any, payload: SessionDocumentSyncPayload): void;
   emitDocumentUpdateToPeers(
     sessionId: string,
@@ -81,13 +81,17 @@ export function createSocketIoSessionTransport(namespace: SessionNamespace): Ses
     joinSessionRoom(socket: any, sessionId: string) {
       socket.join(getSessionRoom(sessionId));
     },
-    disconnectSocket(socketId?: string) {
+    disconnectSocket(socketId?: string, reasonCode?: string) {
       if (!socketId) {
         return;
       }
 
       const staleSocket = namespace.sockets.get(socketId);
       if (staleSocket) {
+        staleSocket.data.superseded = true;
+        if (reasonCode) {
+          staleSocket.emit('session:error', { message: reasonCode });
+        }
         staleSocket.disconnect(true);
       }
     },

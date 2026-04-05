@@ -2,51 +2,93 @@ import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { CollaborativeMonacoEditor } from '@/components/CollaborativeMonacoEditor';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCollabSession } from '@/hooks/useCollabSession';
 import { cn } from '@/lib/utils';
-import { useAppStore } from '@/store/useAppStore';
+import { ConnectionStatus, useAppStore } from '@/store/useAppStore';
 
-function getConnectionPresentation(status: string, hasError: boolean, hasSessionEnded: boolean) {
+function getConnectionPresentation(
+  status: ConnectionStatus,
+  hasError: boolean,
+  hasSessionEnded: boolean,
+) {
   if (hasSessionEnded) {
     return {
       label: 'Session ended',
       message: 'This collaboration session has ended. Returning you to matching...',
       tone: 'warning',
-    };
-  }
-
-  if (hasError) {
-    return {
-      label: 'Connection issue',
-      message: 'We could not keep your collaboration session connected.',
-      tone: 'error',
+      showExitAction: false,
     };
   }
 
   switch (status) {
     case 'connected':
+    case 'live':
       return {
         label: 'Live',
         message: 'Connected. Changes sync automatically for both participants.',
         tone: 'success',
+        showExitAction: false,
       };
+    case 'connecting':
     case 'reconnecting':
       return {
         label: 'Reconnecting',
-        message: 'Your connection dropped. Rejoining your session automatically...',
+        message: 'Connection lost. Rejoining your session automatically...',
         tone: 'warning',
+        showExitAction: false,
       };
-    case 'connecting':
+    case 'joining':
       return {
         label: 'Joining',
         message: 'Preparing your collaboration session...',
         tone: 'neutral',
+        showExitAction: false,
+      };
+    case 'rejoined-awaiting-sync':
+      return {
+        label: 'Restoring session',
+        message: 'Connected again. Restoring your shared editor state...',
+        tone: 'warning',
+        showExitAction: false,
+      };
+    case 'grace-expired':
+      return {
+        label: 'Reconnect window expired',
+        message:
+          'You were disconnected too long and your reserved place in this session expired.',
+        tone: 'error',
+        showExitAction: true,
+      };
+    case 'reconnect-failed':
+      return {
+        label: 'Unable to reconnect',
+        message: 'We could not reconnect you to this session. Return to matching to start again.',
+        tone: 'error',
+        showExitAction: true,
+      };
+    case 'ended':
+      return {
+        label: 'Session ended',
+        message: 'This collaboration session has ended. Returning you to matching...',
+        tone: 'warning',
+        showExitAction: false,
+      };
+    case 'error':
+      return {
+        label: 'Connection issue',
+        message: hasError
+          ? 'We could not prepare your collaboration session.'
+          : 'We could not keep your collaboration session connected.',
+        tone: 'error',
+        showExitAction: true,
       };
     default:
       return {
         label: 'Disconnected',
         message: 'Your session is temporarily unavailable.',
         tone: 'warning',
+        showExitAction: hasError,
       };
   }
 }
@@ -98,6 +140,7 @@ function formatTopic(topic: unknown): string {
 const Session = () => {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
+  const { user } = useAuth();
   const {
     pendingSession,
     collabSessionStatus,
@@ -116,8 +159,14 @@ const Session = () => {
       return;
     }
 
+    if (user && pendingSession.userId !== user.id) {
+      clearPendingSession();
+      navigate('/match', { replace: true });
+      return;
+    }
+
     setCurrentState('session');
-  }, [clearPendingSession, navigate, pendingSession, sessionId, setCurrentState]);
+  }, [clearPendingSession, navigate, pendingSession, sessionId, setCurrentState, user]);
 
   useEffect(() => {
     if (!sessionEnded) {
@@ -156,8 +205,14 @@ const Session = () => {
     Boolean(sessionEnded),
   );
 
-  const editorReadOnly =
-    !sharedDoc || collabSessionStatus === 'connecting' || collabSessionStatus === 'reconnecting';
+  const editorReadOnlyStatuses: ConnectionStatus[] = [
+    'joining',
+    'reconnecting',
+    'rejoined-awaiting-sync',
+    'reconnect-failed',
+    'grace-expired',
+  ];
+  const editorReadOnly = !sharedDoc || editorReadOnlyStatuses.includes(collabSessionStatus);
 
   return (
     <div className="min-h-screen bg-background">
@@ -196,11 +251,28 @@ const Session = () => {
               <div>
                 <p className="text-sm font-semibold">{connection.label}</p>
                 <p className="text-sm opacity-90">{connection.message}</p>
+                {collabSessionStatus === 'grace-expired' && (
+                  <p className="mt-2 text-sm opacity-90">
+                    Leave this session and return to matching to start a new collaboration round.
+                  </p>
+                )}
                 {collabError && <p className="mt-2 text-sm opacity-90">{collabError}</p>}
               </div>
-              <span className="inline-flex rounded-full border border-current/20 px-3 py-1 text-xs font-medium uppercase tracking-wide">
-                {pendingSession.language}
-              </span>
+              <div className="flex flex-col items-start gap-3 md:items-end">
+                <span className="inline-flex rounded-full border border-current/20 px-3 py-1 text-xs font-medium uppercase tracking-wide">
+                  {pendingSession.language}
+                </span>
+                {connection.showExitAction && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLeave}
+                    className="border-current/20 bg-transparent hover:bg-background/40"
+                  >
+                    Return to matching
+                  </Button>
+                )}
+              </div>
             </div>
           </section>
 
@@ -213,8 +285,14 @@ const Session = () => {
                 statusMessage={
                   sessionEnded
                     ? 'Session ended'
+                    : collabSessionStatus === 'grace-expired'
+                      ? 'Reconnect window expired'
+                      : collabSessionStatus === 'reconnect-failed'
+                        ? 'Unable to reconnect'
+                      : collabSessionStatus === 'rejoined-awaiting-sync'
+                        ? 'Restoring your shared editor...'
                     : editorReadOnly
-                      ? 'Syncing shared editor...'
+                      ? 'Reconnecting and syncing shared editor...'
                       : 'Live shared editor'
                 }
               />
@@ -262,8 +340,9 @@ const Session = () => {
                       (joinedSession?.participantIds.includes(participantId)
                         ? 'connected'
                         : isCurrentUser &&
-                            (collabSessionStatus === 'connected' ||
-                              collabSessionStatus === 'reconnecting')
+                            (collabSessionStatus === 'live' ||
+                              collabSessionStatus === 'reconnecting' ||
+                              collabSessionStatus === 'rejoined-awaiting-sync')
                           ? 'connected'
                           : 'disconnected');
                     const presence = getPresencePresentation(derivedStatus);

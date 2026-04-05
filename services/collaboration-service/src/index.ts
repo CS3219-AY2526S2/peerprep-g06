@@ -35,6 +35,8 @@ const io = new Server<
     origin: config.frontendOrigin,
     methods: ['GET', 'POST'],
   },
+  pingInterval: 10_000,
+  pingTimeout: 5_000,
 });
 
 app.use(

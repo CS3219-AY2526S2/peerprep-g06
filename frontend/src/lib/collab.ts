@@ -52,11 +52,12 @@ export function createSessionSocket(
   accessToken: string,
   sessionId: string,
   joinToken: string,
+  reconnectAttempts: number,
 ): SessionSocket {
   return io(`${COLLAB_WS_URL}/session`, {
     transports: ['websocket'],
     reconnection: true,
-    reconnectionAttempts: Infinity,
+    reconnectionAttempts: reconnectAttempts,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 4000,
     timeout: 10000,
