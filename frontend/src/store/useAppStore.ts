@@ -3,23 +3,68 @@ import { SessionReadyPayload } from '../../../shared/types';
 
 export type AppState = 'landing' | 'login' | 'signup' | 'matching' | 'queue' | 'session';
 export type Difficulty = 'easy' | 'medium' | 'hard';
-export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
+export type ConnectionStatus =
+  | 'idle'
+  | 'connecting'
+  | 'joining'
+  | 'connected'
+  | 'live'
+  | 'reconnecting'
+  | 'rejoined-awaiting-sync'
+  | 'reconnect-failed'
+  | 'grace-expired'
+  | 'disconnected'
+  | 'ended'
+  | 'error';
 
 const PENDING_SESSION_STORAGE_KEY = 'peerprep.pendingSession';
+
+interface PersistedPendingSession {
+  session: SessionReadyPayload;
+  savedAt: string;
+}
+
+function parsePendingSession(value: string): SessionReadyPayload | null {
+  const parsed = JSON.parse(value) as PersistedPendingSession | SessionReadyPayload;
+
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    'session' in parsed &&
+    parsed.session &&
+    typeof parsed.session === 'object'
+  ) {
+    return parsed.session;
+  }
+
+  return parsed as SessionReadyPayload;
+}
 
 function loadPendingSession(): SessionReadyPayload | null {
   if (typeof window === 'undefined') {
     return null;
   }
 
-  const storedValue = window.sessionStorage.getItem(PENDING_SESSION_STORAGE_KEY);
+  const storedValue =
+    window.localStorage.getItem(PENDING_SESSION_STORAGE_KEY) ||
+    window.sessionStorage.getItem(PENDING_SESSION_STORAGE_KEY);
   if (!storedValue) {
     return null;
   }
 
   try {
-    return JSON.parse(storedValue) as SessionReadyPayload;
+    const session = parsePendingSession(storedValue);
+
+    if (window.sessionStorage.getItem(PENDING_SESSION_STORAGE_KEY)) {
+      window.sessionStorage.removeItem(PENDING_SESSION_STORAGE_KEY);
+      if (session) {
+        persistPendingSession(session);
+      }
+    }
+
+    return session;
   } catch {
+    window.localStorage.removeItem(PENDING_SESSION_STORAGE_KEY);
     window.sessionStorage.removeItem(PENDING_SESSION_STORAGE_KEY);
     return null;
   }
@@ -31,11 +76,18 @@ function persistPendingSession(session: SessionReadyPayload | null): void {
   }
 
   if (!session) {
+    window.localStorage.removeItem(PENDING_SESSION_STORAGE_KEY);
     window.sessionStorage.removeItem(PENDING_SESSION_STORAGE_KEY);
     return;
   }
 
-  window.sessionStorage.setItem(PENDING_SESSION_STORAGE_KEY, JSON.stringify(session));
+  const storedValue: PersistedPendingSession = {
+    session,
+    savedAt: new Date().toISOString(),
+  };
+
+  window.localStorage.setItem(PENDING_SESSION_STORAGE_KEY, JSON.stringify(storedValue));
+  window.sessionStorage.removeItem(PENDING_SESSION_STORAGE_KEY);
 }
 
 interface User {

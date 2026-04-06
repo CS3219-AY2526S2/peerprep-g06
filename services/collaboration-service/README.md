@@ -104,6 +104,13 @@ Required infrastructure:
 - Supabase Auth
 
 Required environment variables are documented in `.env.example`.
+The current service-specific names are:
+
+- `PORT`
+- `FRONTEND_ORIGIN`
+- `PUBLIC_WS_URL`
+- `GRACE_PERIOD_MS`
+- `JOIN_TOKEN_TTL_MS`
 
 ## 5. File-By-File Walkthrough
 
@@ -121,9 +128,11 @@ Top to bottom:
 
 1. `name`, `version`, `description`, `main` are standard package metadata.
 2. `scripts.dev` runs the TypeScript service directly with `tsx watch`.
-3. `scripts.build` compiles `src/` into `dist/`.
-4. `scripts.start` runs the compiled JS output.
-5. `dependencies`:
+3. `scripts.typecheck` validates the service without emitting build output.
+4. `scripts.build` compiles `src/` into `dist/`.
+5. `scripts.test` runs the minimal node-based automated tests.
+6. `scripts.start` runs the compiled JS output.
+7. `dependencies`:
    - `amqplib`: RabbitMQ client
    - `cors`: Express CORS support
    - `dotenv`: environment loading
@@ -131,7 +140,7 @@ Top to bottom:
    - `redis`: Redis client
    - `socket.io`: realtime transport
    - `yjs`: CRDT document engine
-6. `devDependencies` are the TypeScript/dev-only packages.
+8. `devDependencies` are the TypeScript/dev-only packages.
 
 ### 5.2 `Dockerfile`
 
@@ -204,8 +213,9 @@ Read it top to bottom like this:
 16. defines `bootstrap()`
 17. in `bootstrap()`:
     - connect to Redis
+    - recover in-flight reconnect grace timers from Redis
+    - register the RabbitMQ consumer callback
     - connect to RabbitMQ
-    - start the `MatchFound` consumer
     - start listening on the configured port
 18. if bootstrap fails, log the error and exit the process
 
@@ -247,17 +257,21 @@ Top to bottom:
 2. imports `config`
 3. imports the logger
 4. defines module-level `connection` and `channel` caches
-5. exports `connectRabbitMq()`
-6. `connectRabbitMq()`:
+5. exports `registerRabbitMqConsumer()` so consumer setup can be re-run on reconnect
+6. exports `connectRabbitMq()`
+7. `connectRabbitMq()`:
    - returns the cached connection/channel if already connected
    - otherwise opens a new AMQP connection
    - creates a channel
+   - attaches `close` and `error` handlers
    - logs success
+   - re-registers all known consumers
    - returns both objects
 
 Why it matters:
 
 - consumers should not open a new RabbitMQ connection every time they need to work
+- the service should re-subscribe automatically if RabbitMQ drops the channel
 
 ### 5.7 `src/config/redis.ts`
 
@@ -432,8 +446,9 @@ Function walkthrough:
 19. `listPendingDeliveries()` loads all indexed records and lazily cleans broken index entries
 20. `saveGracePeriod()` writes a reconnect grace record
 21. `getGracePeriod()` reads a reconnect grace record
-22. `clearGracePeriod()` deletes it
-23. `deleteSessionState()` deletes all Redis state associated with a finished session
+22. `listGracePeriods()` scans Redis for grace records so startup can recover in-memory timers
+23. `clearGracePeriod()` deletes it
+24. `deleteSessionState()` deletes all Redis state associated with a finished session
 
 If someone changes key names or record shapes, this is the file they must understand first.
 
@@ -646,7 +661,8 @@ Top to bottom:
     - clears the grace record
     - emits `participant:status`
     - ends the session if both are gone
-18. `handleParticipantLeave()`:
+18. `recoverScheduledGracePeriods()` reloads outstanding grace records from Redis on startup and rebuilds their in-memory timers
+19. `handleParticipantLeave()`:
     - prevents double handling
     - marks the socket as explicit leave
     - clears grace state
@@ -654,7 +670,7 @@ Top to bottom:
     - emits `participant:status` to the peer
     - ends the session if both are gone
     - disconnects the socket
-19. `handleUnexpectedDisconnect()`:
+20. `handleUnexpectedDisconnect()`:
     - ignores disconnects caused by explicit leave
     - reloads session + participant state
     - verifies the disconnect is for the current active socket
@@ -662,8 +678,8 @@ Top to bottom:
     - stores the grace record
     - schedules the grace expiry timer
     - emits `participant:status`
-20. `configureSessionNamespace()` sets up the namespace middleware and connection handler
-21. middleware:
+21. `configureSessionNamespace()` sets up the namespace middleware and connection handler
+22. middleware:
     - reads `token`, `sessionId`, `joinToken`
     - verifies the access token with Supabase
     - loads the session, participants, and join-token record
@@ -675,19 +691,19 @@ Top to bottom:
     - marks the participant `connected`
     - clears any grace record
     - stores `userId`, `sessionId`, and previous status on the socket
-22. on connection:
+23. on connection:
     - joins the session room through the transport
     - marks session status `active`
     - emits `session:joined`
     - emits `doc:sync`
     - emits peer-facing `participant:status` to announce join or reconnect
-23. on `doc:update`:
+24. on `doc:update`:
     - validates payload
     - applies the Yjs update
     - emits the update to the peer through the transport
-24. on `session:leave`:
+25. on `session:leave`:
     - runs graceful leave logic
-25. on `disconnect`:
+26. on `disconnect`:
     - runs unexpected disconnect logic
 
 This is the file to read carefully if someone is debugging reconnect or leave behavior.
@@ -948,13 +964,24 @@ Manual smoke-test sequence:
 
 These are important for the next developer.
 
-1. There is currently no automated test suite in this service.
-2. Grace expiry scheduling is in memory, while the grace record itself is in Redis.
-3. If the service restarts mid-session, active in-memory timers are lost.
-4. Yjs state is persisted, but active in-memory docs are runtime-local.
-5. The Dockerfile currently runs the dev server instead of the compiled production server.
-6. The frontend Monaco binding is not implemented in this service because it belongs in the frontend.
-7. The gateway is not implemented here; only the adapter boundary exists.
+1. The automated test layer currently covers contract parsing, session seed creation, and join-token validation only; there are still no full integration tests.
+2. Grace expiry scheduling is rebuilt from Redis on startup, but timers still live in memory while the process is running.
+3. Yjs state is persisted, but active in-memory docs are runtime-local.
+4. The Dockerfile currently runs the dev server instead of the compiled production server.
+5. The gateway is not implemented here; only the adapter boundary exists.
+
+## 12.1 Direct Frontend Flow
+
+The direct frontend flow is now:
+
+1. Queue page joins matching and collab notifications in parallel.
+2. Matching emits lightweight `match_found`, which only moves the queue UI into "setting up session".
+3. Collaboration emits `session-ready`, which is the real bootstrap event.
+4. Frontend stores `SessionReadyPayload` in `sessionStorage` and navigates to `/session/:sessionId`.
+5. The session page mounts a Monaco editor bound to a frontend Yjs document.
+6. `doc:sync` replaces the local Yjs document with the backend snapshot.
+7. Local Yjs changes emit `doc:update` to collab.
+8. Remote `doc:update` payloads are applied back into the same Yjs document.
 
 ## 13. Recommended Reading Order For A New Developer
 
@@ -986,6 +1013,13 @@ If they need to integrate the gateway, read:
 1. `src/services/realtimeTransport.ts`
 2. `src/services/notificationService.ts`
 3. `src/services/sessionSocket.ts`
+
+If they need to understand the direct frontend integration, also read:
+
+1. `frontend/src/hooks/useCollabNotifications.ts`
+2. `frontend/src/hooks/useCollabSession.ts`
+3. `frontend/src/components/CollaborativeMonacoEditor.tsx`
+4. `frontend/src/pages/Session.tsx`
 
 ## 14. Final Mental Model
 

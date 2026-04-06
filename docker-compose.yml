@@ -55,7 +55,7 @@ services:
       - PORT=3003
       - QUESTION_SERVICE_URL=http://question-service:3002
       - NODE_ENV=development
-      - MATCHING_TIMEOUT_MS=3000
+      - MATCHING_TIMEOUT_MS=30000
       - LOG_LEVEL=debug
       - RABBITMQ_URL=amqp://user:root@rabbitmq:5672
     volumes:

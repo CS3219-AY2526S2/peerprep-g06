@@ -1,35 +1,166 @@
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { CollaborativeMonacoEditor } from '@/components/CollaborativeMonacoEditor';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCollabSession } from '@/hooks/useCollabSession';
-import { useAppStore } from '@/store/useAppStore';
+import { cn } from '@/lib/utils';
+import { ConnectionStatus, useAppStore } from '@/store/useAppStore';
+
+function getConnectionPresentation(
+  status: ConnectionStatus,
+  hasError: boolean,
+  hasSessionEnded: boolean,
+) {
+  if (hasSessionEnded) {
+    return {
+      label: 'Session ended',
+      message: 'This collaboration session has ended. Returning you to matching...',
+      tone: 'warning',
+      showExitAction: false,
+    };
+  }
+
+  switch (status) {
+    case 'connected':
+    case 'live':
+      return {
+        label: 'Live',
+        message: 'Connected. Changes sync automatically for both participants.',
+        tone: 'success',
+        showExitAction: false,
+      };
+    case 'connecting':
+    case 'reconnecting':
+      return {
+        label: 'Reconnecting',
+        message: 'Connection lost. Rejoining your session automatically...',
+        tone: 'warning',
+        showExitAction: false,
+      };
+    case 'joining':
+      return {
+        label: 'Joining',
+        message: 'Preparing your collaboration session...',
+        tone: 'neutral',
+        showExitAction: false,
+      };
+    case 'rejoined-awaiting-sync':
+      return {
+        label: 'Restoring session',
+        message: 'Connected again. Restoring your shared editor state...',
+        tone: 'warning',
+        showExitAction: false,
+      };
+    case 'grace-expired':
+      return {
+        label: 'Reconnect window expired',
+        message: 'You were disconnected too long and your reserved place in this session expired.',
+        tone: 'error',
+        showExitAction: true,
+      };
+    case 'reconnect-failed':
+      return {
+        label: 'Unable to reconnect',
+        message: 'We could not reconnect you to this session. Return to matching to start again.',
+        tone: 'error',
+        showExitAction: true,
+      };
+    case 'ended':
+      return {
+        label: 'Session ended',
+        message: 'This collaboration session has ended. Returning you to matching...',
+        tone: 'warning',
+        showExitAction: false,
+      };
+    case 'error':
+      return {
+        label: 'Connection issue',
+        message: hasError
+          ? 'We could not prepare your collaboration session.'
+          : 'We could not keep your collaboration session connected.',
+        tone: 'error',
+        showExitAction: true,
+      };
+    default:
+      return {
+        label: 'Disconnected',
+        message: 'Your session is temporarily unavailable.',
+        tone: 'warning',
+        showExitAction: hasError,
+      };
+  }
+}
+
+function getPresencePresentation(status?: 'connected' | 'disconnected' | 'left') {
+  if (status === 'connected') {
+    return {
+      label: 'Connected',
+      tone: 'success',
+    };
+  }
+
+  if (status === 'left') {
+    return {
+      label: 'Left session',
+      tone: 'muted',
+    };
+  }
+
+  return {
+    label: 'Reconnecting',
+    tone: 'warning',
+  };
+}
+
+const toneStyles = {
+  neutral: 'border-border bg-card text-foreground',
+  success: 'border-success/20 bg-success/10 text-success',
+  warning: 'border-warning/20 bg-warning/10 text-warning',
+  error: 'border-destructive/20 bg-destructive/10 text-destructive',
+  muted: 'border-border bg-secondary/60 text-muted-foreground',
+} as const;
+
+function formatTopic(topic: unknown): string {
+  if (Array.isArray(topic)) {
+    return topic
+      .map((value) => String(value).split('_').join(' '))
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  if (typeof topic === 'string') {
+    return topic.split('_').join(' ');
+  }
+
+  return 'General';
+}
 
 const Session = () => {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
+  const { user } = useAuth();
   const { pendingSession, collabSessionStatus, collabError, setCurrentState, clearPendingSession } =
     useAppStore();
 
-  const {
-    joinedSession,
-    participantStatuses,
-    latestDocSync,
-    latestDocUpdate,
-    sessionEnded,
-    eventLog,
-    reconnect,
-    leaveSession,
-    clearEventLog,
-  } = useCollabSession(pendingSession);
+  const { sharedDoc, joinedSession, participantStatuses, sessionEnded, leaveSession } =
+    useCollabSession(pendingSession);
 
   useEffect(() => {
     if (!pendingSession || !sessionId || pendingSession.sessionId !== sessionId) {
+      clearPendingSession();
+      navigate('/match', { replace: true });
+      return;
+    }
+
+    if (user && pendingSession.userId !== user.id) {
+      clearPendingSession();
       navigate('/match', { replace: true });
       return;
     }
 
     setCurrentState('session');
-  }, [navigate, pendingSession, sessionId, setCurrentState]);
+  }, [clearPendingSession, navigate, pendingSession, sessionId, setCurrentState, user]);
 
   useEffect(() => {
     if (!sessionEnded) {
@@ -44,6 +175,16 @@ const Session = () => {
     return () => window.clearTimeout(timeoutId);
   }, [clearPendingSession, navigate, sessionEnded]);
 
+  const participantIds = Array.from(
+    new Set(
+      [
+        pendingSession?.userId,
+        ...(joinedSession?.participantIds ?? []),
+        ...Object.keys(participantStatuses),
+      ].filter((value): value is string => Boolean(value)),
+    ),
+  );
+
   if (!pendingSession || !sessionId || pendingSession.sessionId !== sessionId) {
     return null;
   }
@@ -54,168 +195,184 @@ const Session = () => {
     navigate('/match', { replace: true });
   };
 
+  const connection = getConnectionPresentation(
+    collabSessionStatus,
+    Boolean(collabError),
+    Boolean(sessionEnded),
+  );
+
+  const editorReadOnlyStatuses: ConnectionStatus[] = [
+    'joining',
+    'reconnecting',
+    'rejoined-awaiting-sync',
+    'reconnect-failed',
+    'grace-expired',
+  ];
+  const editorReadOnly = !sharedDoc || editorReadOnlyStatuses.includes(collabSessionStatus);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="absolute inset-0 gradient-glow opacity-20" />
 
-      <main className="relative z-10 container mx-auto px-6 py-12 max-w-6xl space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">
-              Collaboration <span className="text-gradient">Session Test</span>
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Session {pendingSession.sessionId} / {pendingSession.language}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button variant="outline" onClick={reconnect}>
-              Reconnect session socket
-            </Button>
-            <Button variant="outline" onClick={clearEventLog}>
-              Clear debug log
-            </Button>
-            <Button variant="hero" onClick={handleLeave}>
-              Leave session
-            </Button>
-          </div>
-        </div>
-
-        {sessionEnded && (
-          <div className="rounded-xl border border-primary/30 bg-primary/10 p-4">
-            <p className="font-medium text-foreground">Session ended</p>
-            <p className="text-sm text-muted-foreground">
-              All participants have left. Returning to matching...
-            </p>
-          </div>
-        )}
-
-        {collabError && (
-          <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-500">
-            {collabError}
-          </div>
-        )}
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
-            <div>
-              <h2 className="text-xl font-semibold">Question details</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Payload from collaboration service session-ready
-              </p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-lg font-semibold">{pendingSession.question.title}</p>
-              <p className="text-sm text-muted-foreground">
-                {pendingSession.question.difficulty} / {pendingSession.question.topic}
-              </p>
-              <p className="text-sm leading-6 whitespace-pre-wrap">
-                {pendingSession.question.description}
-              </p>
-            </div>
-            <div className="rounded-lg bg-background/80 p-4 text-sm">
-              <p>
-                <span className="font-medium">Current user:</span> {pendingSession.userId}
-              </p>
-              <p>
-                <span className="font-medium">WebSocket URL:</span> {pendingSession.websocketUrl}
-              </p>
-              <p>
-                <span className="font-medium">Grace period:</span> {pendingSession.gracePeriodMs}ms
-              </p>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
-            <div>
-              <h2 className="text-xl font-semibold">Connection state</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Session join and socket lifecycle
-              </p>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-lg bg-background/80 p-4 text-sm">
-                <p className="font-medium">Session socket</p>
-                <p className="text-muted-foreground mt-1">{collabSessionStatus}</p>
+      <main className="relative z-10 container mx-auto max-w-7xl px-6 py-10">
+        <div className="space-y-6">
+          <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="space-y-3">
+              <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-primary">
+                Pair Programming Session
               </div>
-              <div className="rounded-lg bg-background/80 p-4 text-sm">
-                <p className="font-medium">Join state</p>
-                <p className="text-muted-foreground mt-1">
-                  {joinedSession
-                    ? `Joined as ${joinedSession.userId}`
-                    : 'Waiting for session:joined'}
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">
+                  {pendingSession.question.title}
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                  Collaborate in real time, keep the discussion in sync, and work through the
+                  problem together.
                 </p>
               </div>
             </div>
-            {joinedSession && (
-              <pre className="overflow-x-auto rounded-lg bg-background/80 p-4 text-xs">
-                {JSON.stringify(joinedSession, null, 2)}
-              </pre>
+
+            <Button variant="outline" onClick={handleLeave}>
+              Leave session
+            </Button>
+          </header>
+
+          <section
+            className={cn(
+              'rounded-2xl border p-4',
+              toneStyles[connection.tone as keyof typeof toneStyles],
             )}
+          >
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold">{connection.label}</p>
+                <p className="text-sm opacity-90">{connection.message}</p>
+                {collabSessionStatus === 'grace-expired' && (
+                  <p className="mt-2 text-sm opacity-90">
+                    Leave this session and return to matching to start a new collaboration round.
+                  </p>
+                )}
+                {collabError && <p className="mt-2 text-sm opacity-90">{collabError}</p>}
+              </div>
+              <div className="flex flex-col items-start gap-3 md:items-end">
+                <span className="inline-flex rounded-full border border-current/20 px-3 py-1 text-xs font-medium uppercase tracking-wide">
+                  {pendingSession.language}
+                </span>
+                {connection.showExitAction && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLeave}
+                    className="border-current/20 bg-transparent hover:bg-background/40"
+                  >
+                    Return to matching
+                  </Button>
+                )}
+              </div>
+            </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
-            <div>
-              <h2 className="text-xl font-semibold">Participant statuses</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Live participant:status events from the session room
-              </p>
-            </div>
-            {Object.keys(participantStatuses).length === 0 ? (
-              <p className="text-sm text-muted-foreground">No participant status updates yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {Object.values(participantStatuses).map((participant) => (
-                  <div key={participant.userId} className="rounded-lg bg-background/80 p-4 text-sm">
-                    <p className="font-medium">{participant.userId}</p>
-                    <p className="text-muted-foreground">
-                      {participant.status} / {participant.reason}
-                    </p>
-                    <p className="text-muted-foreground">{participant.at}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <section className="space-y-4">
+              <CollaborativeMonacoEditor
+                doc={sharedDoc}
+                language={pendingSession.language}
+                readOnly={editorReadOnly || Boolean(sessionEnded)}
+                statusMessage={
+                  sessionEnded
+                    ? 'Session ended'
+                    : collabSessionStatus === 'grace-expired'
+                      ? 'Reconnect window expired'
+                      : collabSessionStatus === 'reconnect-failed'
+                        ? 'Unable to reconnect'
+                        : collabSessionStatus === 'rejoined-awaiting-sync'
+                          ? 'Restoring your shared editor...'
+                          : editorReadOnly
+                            ? 'Reconnecting and syncing shared editor...'
+                            : 'Live shared editor'
+                }
+              />
+            </section>
 
-          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
-            <div>
-              <h2 className="text-xl font-semibold">Document sync and debug</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Latest doc:sync, doc:update, and session logs
-              </p>
-            </div>
-            <div className="grid gap-4">
-              <div>
-                <p className="text-sm font-medium mb-2">Latest doc:sync</p>
-                <pre className="overflow-x-auto rounded-lg bg-background/80 p-4 text-xs">
-                  {JSON.stringify(latestDocSync, null, 2)}
-                </pre>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Latest doc:update</p>
-                <pre className="overflow-x-auto rounded-lg bg-background/80 p-4 text-xs">
-                  {JSON.stringify(latestDocUpdate, null, 2)}
-                </pre>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Event log</p>
-                <div className="max-h-80 overflow-y-auto rounded-lg bg-background/80 p-4 space-y-3">
-                  {eventLog.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No events yet.</p>
-                  ) : (
-                    eventLog.map((entry) => (
-                      <div key={entry.id} className="text-sm">
-                        <p className="font-medium">{entry.event}</p>
-                        <p className="text-muted-foreground">{entry.summary}</p>
-                        <p className="text-xs text-muted-foreground">{entry.at}</p>
-                      </div>
-                    ))
-                  )}
+            <aside className="space-y-6">
+              <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-foreground">Problem</h2>
+                  <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium capitalize text-secondary-foreground">
+                    {pendingSession.question.difficulty}
+                  </span>
                 </div>
-              </div>
-            </div>
-          </section>
+
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-border/80 bg-background/70 px-4 py-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Topic</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">
+                      {formatTopic(pendingSession.question.topic)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm leading-7 whitespace-pre-wrap text-foreground/90">
+                      {pendingSession.question.description}
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-foreground">Participants</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Presence updates refresh automatically during the session.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {participantIds.map((participantId) => {
+                    const participant = participantStatuses[participantId];
+                    const isCurrentUser = participantId === pendingSession.userId;
+                    const derivedStatus =
+                      participant?.status ??
+                      (joinedSession?.participantIds.includes(participantId)
+                        ? 'connected'
+                        : isCurrentUser &&
+                            (collabSessionStatus === 'live' ||
+                              collabSessionStatus === 'reconnecting' ||
+                              collabSessionStatus === 'rejoined-awaiting-sync')
+                          ? 'connected'
+                          : 'disconnected');
+                    const presence = getPresencePresentation(derivedStatus);
+
+                    return (
+                      <div
+                        key={participantId}
+                        className="rounded-xl border border-border/80 bg-background/70 px-4 py-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              {isCurrentUser ? 'You' : 'Partner'}
+                            </p>
+                            <p className="mt-1 break-all text-xs text-muted-foreground">
+                              {participantId}
+                            </p>
+                          </div>
+                          <span
+                            className={cn(
+                              'rounded-full px-3 py-1 text-xs font-medium',
+                              toneStyles[presence.tone as keyof typeof toneStyles],
+                            )}
+                          >
+                            {presence.label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            </aside>
+          </div>
         </div>
       </main>
     </div>

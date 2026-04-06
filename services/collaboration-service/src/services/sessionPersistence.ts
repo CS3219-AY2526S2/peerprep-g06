@@ -271,6 +271,22 @@ export async function getGracePeriod(
   return parseJson<GracePeriodRecord>(await redis.get(collabKeys.graceTimer(sessionId, userId)));
 }
 
+export async function listGracePeriods(): Promise<GracePeriodRecord[]> {
+  const gracePeriods: GracePeriodRecord[] = [];
+
+  for await (const key of redis.scanIterator({
+    MATCH: 'collab:session:*:grace:*',
+    COUNT: 100,
+  })) {
+    const record = parseJson<GracePeriodRecord>(await redis.get(String(key)));
+    if (record) {
+      gracePeriods.push(record);
+    }
+  }
+
+  return gracePeriods;
+}
+
 export async function clearGracePeriod(sessionId: string, userId: string): Promise<void> {
   await redis.del(collabKeys.graceTimer(sessionId, userId));
 }

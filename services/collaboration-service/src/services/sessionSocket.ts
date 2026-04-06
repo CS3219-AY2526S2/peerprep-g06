@@ -18,6 +18,7 @@ import {
   getSession,
   getStoredJoinToken,
   hashJoinToken,
+  listGracePeriods,
   saveGracePeriod,
   updateParticipantPresence,
   updateSessionStatus,
@@ -29,6 +30,7 @@ import {
 } from './documentSyncService';
 import { SessionTransport } from './realtimeTransport';
 import { logger } from '../utils/logger';
+import { StoredJoinToken } from '../types/session';
 
 type SessionNamespace = Namespace<
   CollaborationSessionSocketClientToServerEvents,
@@ -67,6 +69,21 @@ function clearScheduledGraceTimeout(sessionId: string, userId: string): void {
     clearTimeout(existingTimeout);
     graceTimeouts.delete(timeoutKey);
   }
+}
+
+export function isStoredJoinTokenValid(
+  sessionId: string,
+  userId: string,
+  providedJoinToken: string,
+  storedJoinToken: StoredJoinToken,
+  nowIso = new Date().toISOString(),
+): boolean {
+  return (
+    storedJoinToken.claims.sessionId === sessionId &&
+    storedJoinToken.claims.userId === userId &&
+    storedJoinToken.claims.expiresAt > nowIso &&
+    hashJoinToken(providedJoinToken) === storedJoinToken.tokenHash
+  );
 }
 
 async function cleanupEndedSession(transport: SessionTransport, sessionId: string): Promise<void> {
@@ -164,6 +181,30 @@ async function handleGraceExpiry(
   await endSessionIfComplete(transport, sessionId);
 }
 
+export async function recoverScheduledGracePeriods(transport: SessionTransport): Promise<void> {
+  const gracePeriods = await listGracePeriods();
+  let scheduledCount = 0;
+
+  for (const gracePeriod of gracePeriods) {
+    const session = await getSession(gracePeriod.sessionId);
+    if (!session || session.status === 'ended') {
+      await clearGracePeriod(gracePeriod.sessionId, gracePeriod.userId);
+      continue;
+    }
+
+    const remainingMs = new Date(gracePeriod.expiresAt).getTime() - Date.now();
+    if (remainingMs <= 0) {
+      await handleGraceExpiry(transport, gracePeriod.sessionId, gracePeriod.userId);
+      continue;
+    }
+
+    scheduleGraceExpiry(transport, gracePeriod.sessionId, gracePeriod.userId, remainingMs);
+    scheduledCount += 1;
+  }
+
+  logger.info(`Recovered ${scheduledCount} active grace-period timers`);
+}
+
 async function handleParticipantLeave(transport: SessionTransport, socket: any): Promise<void> {
   if (socket.data.leaveHandled) {
     return;
@@ -213,7 +254,7 @@ async function handleUnexpectedDisconnect(
   socket: any,
   reason: string,
 ): Promise<void> {
-  if (socket.data.explicitLeave) {
+  if (socket.data.explicitLeave || socket.data.superseded) {
     return;
   }
 
@@ -269,14 +310,15 @@ export function configureSessionNamespace(
       const accessToken = getBearerToken(socket);
       const sessionId = getHandshakeString(socket.handshake.auth?.sessionId);
       const joinToken = getHandshakeString(socket.handshake.auth?.joinToken);
+      const nowIso = new Date().toISOString();
 
       if (!accessToken || !sessionId || !joinToken) {
-        return next(new Error('Missing session authentication details'));
+        return next(new Error('MISSING_SESSION_AUTH'));
       }
 
       const user = await getSupabaseUser(accessToken);
       if (!user) {
-        return next(new Error('Invalid access token'));
+        return next(new Error('INVALID_ACCESS_TOKEN'));
       }
 
       const [session, participants, storedJoinToken] = await Promise.all([
@@ -285,36 +327,38 @@ export function configureSessionNamespace(
         getStoredJoinToken(sessionId, user.id),
       ]);
 
-      if (!session || !participants || !storedJoinToken) {
-        return next(new Error('Session not found'));
+      if (!session || !participants) {
+        return next(new Error('SESSION_NOT_FOUND'));
+      }
+
+      if (!storedJoinToken) {
+        return next(new Error('SESSION_EXPIRED'));
       }
 
       if (session.status === 'ended') {
-        return next(new Error('Session has already ended'));
+        return next(new Error('SESSION_ENDED'));
       }
 
       const participant = participants.find((entry) => entry.userId === user.id);
       if (!participant) {
-        return next(new Error('User is not a participant in this session'));
+        return next(new Error('USER_NOT_IN_SESSION'));
       }
 
       if (participant.status === 'left') {
-        return next(new Error('User has already left this session'));
+        return next(new Error('SESSION_EXPIRED'));
+      }
+
+      if (storedJoinToken.claims.expiresAt <= nowIso) {
+        return next(new Error('SESSION_EXPIRED'));
       }
 
       if (
         storedJoinToken.claims.sessionId !== sessionId ||
         storedJoinToken.claims.userId !== user.id ||
-        storedJoinToken.claims.expiresAt <= new Date().toISOString()
+        hashJoinToken(joinToken) !== storedJoinToken.tokenHash
       ) {
-        return next(new Error('Join token is invalid or expired'));
+        return next(new Error('INVALID_SESSION_TOKEN'));
       }
-
-      if (hashJoinToken(joinToken) !== storedJoinToken.tokenHash) {
-        return next(new Error('Join token does not match this session'));
-      }
-
-      transport.disconnectSocket(participant.socketId);
 
       const connectedAt = new Date().toISOString();
       clearScheduledGraceTimeout(sessionId, user.id);
@@ -326,13 +370,17 @@ export function configureSessionNamespace(
       });
       await clearGracePeriod(sessionId, user.id);
 
+      if (participant.socketId && participant.socketId !== socket.id) {
+        transport.disconnectSocket(participant.socketId, 'SESSION_SUPERSEDED');
+      }
+
       socket.data.userId = user.id;
       socket.data.sessionId = sessionId;
       socket.data.previousStatus = participant.status;
       return next();
     } catch (error) {
       logger.error('Session socket authentication failed', error);
-      return next(new Error('Session authentication failed'));
+      return next(new Error('SESSION_AUTH_FAILED'));
     }
   });
 

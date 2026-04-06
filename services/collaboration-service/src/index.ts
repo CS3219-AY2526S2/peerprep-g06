@@ -6,7 +6,7 @@ import cors from 'cors';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import { config } from './config/env';
-import { connectRabbitMq } from './config/rabbitmq';
+import { connectRabbitMq, registerRabbitMqConsumer } from './config/rabbitmq';
 import { connectRedis } from './config/redis';
 import { startMatchFoundConsumer } from './services/matchFoundConsumer';
 import { configureNotificationNamespace } from './services/notificationSocket';
@@ -14,7 +14,7 @@ import {
   createSocketIoNotificationTransport,
   createSocketIoSessionTransport,
 } from './services/realtimeTransport';
-import { configureSessionNamespace } from './services/sessionSocket';
+import { configureSessionNamespace, recoverScheduledGracePeriods } from './services/sessionSocket';
 import {
   CollaborationSocketClientToServerEvents,
   CollaborationSessionSocketClientToServerEvents,
@@ -35,6 +35,8 @@ const io = new Server<
     origin: config.frontendOrigin,
     methods: ['GET', 'POST'],
   },
+  pingInterval: 10_000,
+  pingTimeout: 5_000,
 });
 
 app.use(
@@ -64,8 +66,11 @@ app.get('/health', (_req, res) => {
 async function bootstrap() {
   // Infrastructure dependencies are required before the service can consume match events safely.
   await connectRedis();
-  const { channel } = await connectRabbitMq();
-  await startMatchFoundConsumer(channel, notificationTransport);
+  await recoverScheduledGracePeriods(sessionTransport);
+  await registerRabbitMqConsumer((consumerChannel) =>
+    startMatchFoundConsumer(consumerChannel, notificationTransport),
+  );
+  await connectRabbitMq();
 
   server.listen(config.port, () => {
     logger.info(`Collaboration service listening on port ${config.port}`);
