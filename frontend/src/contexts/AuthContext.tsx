@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (supabaseUser) {
       const { data } = await supabase
         .from('profiles')
-        .select('role, is_requesting_admin')
+        .select('role, is_requesting_admin, is_requesting_demote')
         .eq('id', supabaseUser.id)
         .single();
 
@@ -36,7 +36,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name:
           supabaseUser.user_metadata?.display_name || supabaseUser.email?.split('@')[0] || 'User',
         role: data?.role ?? 'user',
-        isRequestingAdmin: data?.is_requesting_admin ?? false, // ← add this
+        isRequestingAdmin: data?.is_requesting_admin ?? false,
+        isRequestingDemote: data?.is_requesting_demote ?? false, // ← add this
       });
     } else {
       storeLogout();
