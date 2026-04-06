@@ -90,6 +90,7 @@ function calculateReconnectAttempts(gracePeriodMs: number): number {
 export function useCollabSession(session: SessionReadyPayload | null) {
   const socketRef = useRef<SessionSocket | null>(null);
   const activeConnectionIdRef = useRef(0);
+  const isDisposedRef = useRef(false);
   const sharedDocRef = useRef<Y.Doc | null>(null);
   const docObserverRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
   const recoverySyncTimeoutRef = useRef<number | null>(null);
@@ -215,6 +216,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
       return;
     }
 
+    isDisposedRef.current = false;
     disconnect();
     const connectionId = activeConnectionIdRef.current + 1;
     activeConnectionIdRef.current = connectionId;
@@ -239,10 +241,18 @@ export function useCollabSession(session: SessionReadyPayload | null) {
         session.joinToken,
         reconnectAttempts,
       );
+
+      if (isDisposedRef.current) {
+        socket.disconnect();
+        return;
+      }
+
       socketRef.current = socket;
 
       const isActiveSocket = () =>
-        socketRef.current === socket && activeConnectionIdRef.current === connectionId;
+        !isDisposedRef.current &&
+        socketRef.current === socket &&
+        activeConnectionIdRef.current === connectionId;
 
       const scheduleRecoverySyncFallback = () => {
         if (!isActiveSocket()) {
@@ -556,6 +566,8 @@ export function useCollabSession(session: SessionReadyPayload | null) {
   }, [disposeSharedDoc, session?.sessionId]);
 
   useEffect(() => {
+    isDisposedRef.current = false;
+
     if (!session) {
       return;
     }
@@ -610,6 +622,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
     void connect();
 
     return () => {
+      isDisposedRef.current = true;
       isLeavingRef.current = true;
       disconnect();
       disposeSharedDoc();

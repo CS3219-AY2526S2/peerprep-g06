@@ -31,6 +31,13 @@ import {
 import { SessionTransport } from './realtimeTransport';
 import { logger } from '../utils/logger';
 import { StoredJoinToken } from '../types/session';
+import {
+  getParticipantConnectedReason,
+  getParticipantStatusSnapshotReason,
+  isSessionComplete,
+  resolveParticipantJoinFailureCode,
+  shouldHandleUnexpectedDisconnect,
+} from './sessionLifecycle';
 
 type SessionNamespace = Namespace<
   CollaborationSessionSocketClientToServerEvents,
@@ -105,7 +112,7 @@ async function endSessionIfComplete(
   sessionId: string,
 ): Promise<boolean> {
   const participants = await getParticipants(sessionId);
-  if (!participants || participants.some((participant) => participant.status !== 'left')) {
+  if (!isSessionComplete(participants)) {
     return false;
   }
 
@@ -254,10 +261,6 @@ async function handleUnexpectedDisconnect(
   socket: any,
   reason: string,
 ): Promise<void> {
-  if (socket.data.explicitLeave || socket.data.superseded) {
-    return;
-  }
-
   const userId = socket.data.userId as string;
   const sessionId = socket.data.sessionId as string;
   const [session, participants] = await Promise.all([
@@ -270,7 +273,14 @@ async function handleUnexpectedDisconnect(
   }
 
   const participant = participants.find((entry) => entry.userId === userId);
-  if (!participant || participant.socketId !== socket.id || participant.status === 'left') {
+  if (
+    !shouldHandleUnexpectedDisconnect({
+      explicitLeave: Boolean(socket.data.explicitLeave),
+      superseded: Boolean(socket.data.superseded),
+      participant,
+      socketId: socket.id,
+    })
+  ) {
     return;
   }
 
@@ -327,39 +337,22 @@ export function configureSessionNamespace(
         getStoredJoinToken(sessionId, user.id),
       ]);
 
-      if (!session || !participants) {
-        return next(new Error('SESSION_NOT_FOUND'));
+      const joinFailureCode = resolveParticipantJoinFailureCode({
+        sessionId,
+        userId: user.id,
+        joinToken,
+        nowIso,
+        session,
+        participants,
+        storedJoinToken,
+        hashJoinToken,
+      });
+
+      if (joinFailureCode) {
+        return next(new Error(joinFailureCode));
       }
 
-      if (!storedJoinToken) {
-        return next(new Error('SESSION_EXPIRED'));
-      }
-
-      if (session.status === 'ended') {
-        return next(new Error('SESSION_ENDED'));
-      }
-
-      const participant = participants.find((entry) => entry.userId === user.id);
-      if (!participant) {
-        return next(new Error('USER_NOT_IN_SESSION'));
-      }
-
-      if (participant.status === 'left') {
-        return next(new Error('SESSION_EXPIRED'));
-      }
-
-      if (storedJoinToken.claims.expiresAt <= nowIso) {
-        return next(new Error('SESSION_EXPIRED'));
-      }
-
-      if (
-        storedJoinToken.claims.sessionId !== sessionId ||
-        storedJoinToken.claims.userId !== user.id ||
-        hashJoinToken(joinToken) !== storedJoinToken.tokenHash
-      ) {
-        return next(new Error('INVALID_SESSION_TOKEN'));
-      }
-
+      const participant = participants!.find((entry) => entry.userId === user.id)!;
       const connectedAt = new Date().toISOString();
       clearScheduledGraceTimeout(sessionId, user.id);
       await updateParticipantPresence(sessionId, user.id, {
@@ -395,6 +388,19 @@ export function configureSessionNamespace(
       getParticipants(sessionId),
     ]);
 
+    if (!socket.connected) {
+      return;
+    }
+
+    const activeParticipant = participants?.find((participant) => participant.userId === userId);
+    if (
+      !activeParticipant ||
+      activeParticipant.status !== 'connected' ||
+      activeParticipant.socketId !== socket.id
+    ) {
+      return;
+    }
+
     const joinedPayload: SessionJoinedPayload = {
       sessionId,
       userId,
@@ -405,13 +411,22 @@ export function configureSessionNamespace(
 
     socket.emit('session:joined', joinedPayload);
     transport.emitDocumentSync(socket, await getDocumentSyncPayload(sessionId));
+    for (const participant of participants ?? []) {
+      socket.emit('participant:status', {
+        sessionId,
+        userId: participant.userId,
+        status: participant.status,
+        reason: getParticipantStatusSnapshotReason(participant),
+        at: participant.disconnectedAt ?? participant.connectedAt ?? new Date().toISOString(),
+      });
+    }
     transport.emitParticipantStatus(
       sessionId,
       {
         sessionId,
         userId,
         status: 'connected',
-        reason: socket.data.previousStatus === 'disconnected' ? 'reconnected' : 'joined',
+        reason: getParticipantConnectedReason(socket.data.previousStatus),
         at: new Date().toISOString(),
       },
       socket.id,

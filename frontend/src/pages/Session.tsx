@@ -200,6 +200,8 @@ const Session = () => {
     Boolean(collabError),
     Boolean(sessionEnded),
   );
+  const detailError =
+    collabError && collabError !== connection.message ? collabError : null;
 
   const editorReadOnlyStatuses: ConnectionStatus[] = [
     'joining',
@@ -252,7 +254,7 @@ const Session = () => {
                     Leave this session and return to matching to start a new collaboration round.
                   </p>
                 )}
-                {collabError && <p className="mt-2 text-sm opacity-90">{collabError}</p>}
+                {detailError && <p className="mt-2 text-sm opacity-90">{detailError}</p>}
               </div>
               <div className="flex flex-col items-start gap-3 md:items-end">
                 <span className="inline-flex rounded-full border border-current/20 px-3 py-1 text-xs font-medium uppercase tracking-wide">
