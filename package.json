@@ -6,9 +6,11 @@
     "build": "npm run build --prefix frontend && npm run build --prefix services/user-service && npm run build --prefix services/question-service && npm run build --prefix services/matching-service && npm run build --prefix services/collaboration-service",
     "typecheck": "npm run typecheck --prefix frontend && npm run typecheck --prefix services/user-service && npm run typecheck --prefix services/question-service && npm run typecheck --prefix services/matching-service && npm run typecheck --prefix services/collaboration-service",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "prettier": "^3.8.1"
   }
 }
