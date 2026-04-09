@@ -14,7 +14,48 @@ export function QueueRing({ state, timeLeft }: QueueRingProps) {
   return (
     <div className="relative flex items-center justify-center" style={{ width: RING_SIZE, height: RING_SIZE }}>
       {state === 'searching' && <SearchingRing timeLeft={timeLeft} />}
+      {state === 'matched' && <MatchedRing />}
     </div>
+  );
+}
+
+function MatchedRing() {
+  return (
+    <>
+      {/* Ring burst — outer */}
+      <div
+        className="absolute rounded-full border-[3px] border-green-500/60 animate-[ring-burst_1s_ease-out_forwards]"
+        style={{ inset: 0 }}
+      />
+      {/* Ring burst — inner (staggered) */}
+      <div
+        className="absolute rounded-full border-2 border-green-500/30 animate-[ring-burst_1s_ease-out_0.15s_forwards]"
+        style={{ inset: 20 }}
+      />
+      {/* Center text */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-sm text-green-500 uppercase tracking-[3px] font-semibold animate-[scale-in_0.3s_ease-out_0.2s_both]">
+            Match
+          </div>
+          <div className="text-3xl font-extrabold text-green-500 animate-[scale-in_0.3s_ease-out_0.35s_both]">
+            FOUND
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes ring-burst {
+          0% { transform: scale(0.3); opacity: 0; }
+          50% { opacity: 1; }
+          100% { transform: scale(1); opacity: 0.3; }
+        }
+        @keyframes scale-in {
+          0% { transform: scale(0); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
+    </>
   );
 }
 
