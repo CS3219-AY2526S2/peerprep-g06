@@ -15,7 +15,35 @@ export function QueueRing({ state, timeLeft }: QueueRingProps) {
     <div className="relative flex items-center justify-center" style={{ width: RING_SIZE, height: RING_SIZE }}>
       {state === 'searching' && <SearchingRing timeLeft={timeLeft} />}
       {state === 'matched' && <MatchedRing />}
+      {state === 'entering-session' && <EnteringSessionRing />}
     </div>
+  );
+}
+
+function EnteringSessionRing() {
+  return (
+    <>
+      {/* Pulsing green ring */}
+      <div
+        className="absolute rounded-full border-2 border-green-500/50 animate-[pulse-ring_2s_ease-in-out_infinite]"
+        style={{ inset: 0 }}
+      />
+      {/* Center text */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-base font-medium text-green-500">
+            Entering session...
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes pulse-ring {
+          0%, 100% { transform: scale(1); opacity: 0.7; }
+          50% { transform: scale(1.05); opacity: 1; }
+        }
+      `}</style>
+    </>
   );
 }
 
