@@ -54,13 +54,16 @@ const Queue = () => {
         setPhase('entering-session');
       }, MATCH_FOUND_DELAY_MS);
     }
+  }, [status, phase]);
 
+  // Clean up match timer on unmount only
+  useEffect(() => {
     return () => {
       if (matchTimerRef.current) {
         clearTimeout(matchTimerRef.current);
       }
     };
-  }, [status, phase]);
+  }, []);
 
   // Navigate to session once pendingSession arrives and ring burst has played
   useEffect(() => {
@@ -85,12 +88,12 @@ const Queue = () => {
   };
 
   // Map status + phase to QueueRing state
-  const getRingState = (): 'searching' | 'matched' | 'entering-session' | 'idle' => {
-    if (phase === 'matched') return 'matched';
-    if (phase === 'entering-session') return 'entering-session';
-    if (status === 'connecting' || status === 'queued') return 'searching';
-    return 'idle';
-  };
+  const ringState = (() => {
+    if (phase === 'matched') return 'matched' as const;
+    if (phase === 'entering-session') return 'entering-session' as const;
+    if (status === 'connecting' || status === 'queued') return 'searching' as const;
+    return 'idle' as const;
+  })();
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
@@ -99,7 +102,7 @@ const Queue = () => {
         {/* Searching */}
         {phase === 'queue' && (status === 'connecting' || status === 'queued') && (
           <div className="flex flex-col items-center animate-fade-in">
-            <QueueRing state={getRingState()} timeLeft={timeLeft} />
+            <QueueRing state={ringState} timeLeft={timeLeft} />
             <h2 className="text-xl font-semibold mt-6 mb-2">Searching for a match...</h2>
             <p className="text-muted-foreground mb-8">
               {selectedDifficulty} / {selectedTopic} / {selectedLanguage}
@@ -113,7 +116,7 @@ const Queue = () => {
         {/* Match Found */}
         {phase === 'matched' && matchData && (
           <div className="flex flex-col items-center animate-fade-in">
-            <QueueRing state={getRingState()} />
+            <QueueRing state={ringState} />
             {matchData.question && (
               <p className="text-muted-foreground mt-6">{matchData.question.title}</p>
             )}
@@ -123,7 +126,7 @@ const Queue = () => {
         {/* Entering Session */}
         {phase === 'entering-session' && (
           <div className="flex flex-col items-center animate-fade-in">
-            <QueueRing state={getRingState()} />
+            <QueueRing state={ringState} />
             <p className="text-muted-foreground mt-6">Setting up your workspace...</p>
           </div>
         )}
