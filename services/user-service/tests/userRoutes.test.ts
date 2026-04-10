@@ -7,7 +7,7 @@ vi.mock('../src/middleware/authMiddleware', () => ({
 }));
 
 vi.mock('../src/controllers/userController', () => ({
-  UserController: { 
+  UserController: {
     healthCheck: vi.fn(),
     getProfile: vi.fn(),
     getNameById: vi.fn(),

@@ -25,7 +25,11 @@ export class UserController {
     try {
       const { userId } = req.params;
 
-      const { data, error } = await supabase.from('profiles').select('display_name').eq('id', userId).single();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', userId)
+        .single();
 
       if (error) throw error;
 

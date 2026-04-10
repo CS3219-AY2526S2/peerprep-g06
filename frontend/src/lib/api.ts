@@ -27,5 +27,6 @@ export const QUESTION_ENDPOINTS = {
 };
 
 export const SUPABASE_ENDPOINTS = {
-  getHistory: (userId: string) => `${SUPABASE_URL}/rest/v1/history?user_id=eq.${userId}&order=created_at.desc`,
-}
+  getHistory: (userId: string) =>
+    `${SUPABASE_URL}/rest/v1/history?user_id=eq.${userId}&order=created_at.desc`,
+};
