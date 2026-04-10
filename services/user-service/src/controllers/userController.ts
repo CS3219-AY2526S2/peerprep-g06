@@ -20,4 +20,23 @@ export class UserController {
       res.status(500).json({ error: err.message });
     }
   }
+
+  static async getNameById(req: Request, res: Response) {
+    try {
+      const { userId } = req.params;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      res.json({ name: data.display_name });
+    } catch (err: any) {
+      console.error('Server error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
 }

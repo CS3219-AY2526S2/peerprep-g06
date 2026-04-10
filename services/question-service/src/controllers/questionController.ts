@@ -9,14 +9,15 @@ export async function getAllQuestions(_req: Request, res: Response) {
   res.json(data);
 }
 
-export async function getRandomQuestion(_req: Request, res: Response) {
-  const { data, error } = await supabase.from('questions').select('*');
+export async function getQuestionById(req: Request, res: Response) {
+  const { id } = req.params;
+
+  const { data, error } = await supabase.from('questions').select('*').eq('id', id).single();
 
   if (error) return res.status(500).json({ error: error.message });
-  if (!data || data.length === 0) return res.status(404).json({ error: 'No questions found' });
+  if (!data) return res.status(404).json({ error: 'Question not found' });
 
-  const random = data[Math.floor(Math.random() * data.length)];
-  res.json(random);
+  res.json(data);
 }
 
 export async function getRandomQuestionByFilter(req: Request, res: Response) {

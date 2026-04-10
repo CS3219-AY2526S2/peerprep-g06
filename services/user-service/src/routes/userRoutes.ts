@@ -7,6 +7,7 @@ const router = Router();
 
 router.get('/health', UserController.healthCheck);
 router.get('/profile', UserController.getProfile);
+router.get('/profile/:userId', UserController.getNameById);
 router.post('/:id/admin-request', RequestController.requestAdmin);
 router.get('/admin-requests', authenticate('developer'), RequestController.getAdminRequests);
 router.patch(

@@ -11,9 +11,9 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest --pool=forks",
+    "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest --coverage --pool=forks"
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",

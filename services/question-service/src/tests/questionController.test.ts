@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response } from 'express';
 import {
   getAllQuestions,
-  getRandomQuestion,
+  getQuestionById,
   getRandomQuestionByFilter,
   addQuestion,
   updateQuestion,
@@ -18,7 +18,7 @@ vi.mock('../lib/supabase', () => {
       delete: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       contains: vi.fn().mockReturnThis(),
-      single: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
     };
     return chain;
   };
@@ -69,38 +69,51 @@ describe('getAllQuestions', () => {
   });
 });
 
-describe('getRandomQuestion', () => {
-  it('returns a random question from the list', async () => {
-    const questions = [{ id: '1' }, { id: '2' }, { id: '3' }];
+describe('getQuestionById', () => {
+  it('returns a question by its ID', async () => {
+    const question = { id: '1', title: 'Two Sum' };
     vi.mocked(supabase.from).mockReturnValueOnce({
-      select: vi.fn().mockResolvedValueOnce({ data: questions, error: null }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: question, error: null }),
+        }),
+      }),
     } as any);
 
+    const req = mockReq({ params: { id: '1' } });
     const res = mockRes();
-    await getRandomQuestion(mockReq(), res);
+    await getQuestionById(req, res);
 
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String) }));
   });
 
   it('returns 404 when no questions exist', async () => {
     vi.mocked(supabase.from).mockReturnValueOnce({
-      select: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      }),
     } as any);
 
     const res = mockRes();
-    await getRandomQuestion(mockReq(), res);
+    await getQuestionById(mockReq({ params: { id: '1' } }), res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'No questions found' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Question not found' });
   });
 
   it('returns 500 on error', async () => {
     vi.mocked(supabase.from).mockReturnValueOnce({
-      select: vi.fn().mockResolvedValueOnce({ data: null, error: { message: 'DB error' } }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: null, error: { message: 'DB error' } }),
+        }),
+      }),
     } as any);
 
     const res = mockRes();
-    await getRandomQuestion(mockReq(), res);
+    await getQuestionById(mockReq({ params: { id: '1' } }), res);
 
     expect(res.status).toHaveBeenCalledWith(500);
   });
@@ -134,6 +147,20 @@ describe('getRandomQuestionByFilter', () => {
     await getRandomQuestionByFilter(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it('returns 500 on error', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      contains: vi.fn().mockResolvedValueOnce({ data: null, error: { message: 'DB error' } }),
+    } as any);
+
+    const req = mockReq({ params: { difficulty: 'easy', topic: 'Arrays' } });
+    const res = mockRes();
+    await getRandomQuestionByFilter(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
   });
 });
 
@@ -195,6 +222,20 @@ describe('updateQuestion', () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
   });
+
+  it('returns 500 on error', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce({
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValueOnce({ data: null, error: { message: 'DB error' } }),
+    } as any);
+
+    const req = mockReq({ params: { id: '1' }, body: { title: 'Updated' } });
+    const res = mockRes();
+    await updateQuestion(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
 });
 
 describe('deleteQuestion', () => {
@@ -225,5 +266,19 @@ describe('deleteQuestion', () => {
     await deleteQuestion(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it('returns 500 on error', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce({
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValueOnce({ data: null, error: { message: 'DB error' } }),
+    } as any);
+
+    const req = mockReq({ params: { id: '1' } });
+    const res = mockRes();
+    await deleteQuestion(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
   });
 });
