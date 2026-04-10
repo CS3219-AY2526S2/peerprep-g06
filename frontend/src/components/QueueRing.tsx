@@ -12,7 +12,10 @@ export function QueueRing({ state, timeLeft }: QueueRingProps) {
   if (state === 'idle') return null;
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: RING_SIZE, height: RING_SIZE }}>
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: RING_SIZE, height: RING_SIZE }}
+    >
       {state === 'searching' && <SearchingRing timeLeft={timeLeft} />}
       {state === 'matched' && <MatchedRing />}
       {state === 'entering-session' && <EnteringSessionRing />}
@@ -31,9 +34,7 @@ function EnteringSessionRing() {
       {/* Center text */}
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-base font-medium text-green-500">
-            Entering session...
-          </div>
+          <div className="text-base font-medium text-green-500">Entering session...</div>
         </div>
       </div>
 

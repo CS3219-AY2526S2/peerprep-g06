@@ -98,7 +98,6 @@ const Queue = () => {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center max-w-md mx-auto px-6">
-
         {/* Searching */}
         {phase === 'queue' && (status === 'connecting' || status === 'queued') && (
           <div className="flex flex-col items-center animate-fade-in">
