@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAppStore, Difficulty } from '@/store/useAppStore';
 import { topics, languages } from '@/lib/mockData';
-import { Code2, LogOut, CheckCircle2, Shield, BookOpen, Clock} from 'lucide-react';
+import { Code2, LogOut, CheckCircle2, Shield, BookOpen, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { DIFFICULTIES } from '../../../shared/constants';
