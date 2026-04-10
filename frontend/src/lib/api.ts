@@ -9,8 +9,7 @@ export const USER_ENDPOINTS = {
   getDemoteRequests: `${GATEWAY_URL}/users/demote-requests`,
   approveAdmin: (requestId: string) => `${GATEWAY_URL}/users/admin-requests/${requestId}/approve`,
   rejectAdmin: (requestId: string) => `${GATEWAY_URL}/users/admin-requests/${requestId}/reject`,
-  approveDemote: (requestId: string) =>
-    `${GATEWAY_URL}/users/demote-requests/${requestId}/approve`,
+  approveDemote: (requestId: string) => `${GATEWAY_URL}/users/demote-requests/${requestId}/approve`,
   rejectDemote: (requestId: string) => `${GATEWAY_URL}/users/demote-requests/${requestId}/reject`,
 };
 
