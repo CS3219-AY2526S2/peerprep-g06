@@ -85,4 +85,63 @@ describe('UserController', () => {
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(String) }));
     });
   });
+
+  describe('getNameById', () => {
+    it('should return display name when user exists', async () => {
+      const req = { params: { userId: 'user-123' } } as any as Request;
+      const res = mockRes();
+
+      const single = vi.fn().mockResolvedValue({
+        data: { display_name: 'Alice' },
+        error: null,
+      });
+      const eq = vi.fn().mockReturnValue({ single });
+      const select = vi.fn().mockReturnValue({ eq });
+      (supabase.from as any).mockReturnValue({ select });
+
+      await UserController.getNameById(req, res);
+
+      expect(supabase.from).toHaveBeenCalledWith('profiles');
+      expect(select).toHaveBeenCalledWith('display_name');
+      expect(eq).toHaveBeenCalledWith('id', 'user-123');
+      expect(res.json).toHaveBeenCalledWith({ name: 'Alice' });
+    });
+
+    it('should return 500 when supabase returns an error', async () => {
+      const req = { params: { userId: 'user-123' } } as any as Request;
+      const res = mockRes();
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const single = vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Query failed' },
+      });
+      const eq = vi.fn().mockReturnValue({ single });
+      const select = vi.fn().mockReturnValue({ eq });
+      (supabase.from as any).mockReturnValue({ select });
+
+      await UserController.getNameById(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Query failed' });
+    });
+
+    it('should return 500 when userId param is missing', async () => {
+      const req = { params: {} } as any as Request;
+      const res = mockRes();
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const single = vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'invalid input' },
+      });
+      const eq = vi.fn().mockReturnValue({ single });
+      const select = vi.fn().mockReturnValue({ eq });
+      (supabase.from as any).mockReturnValue({ select });
+
+      await UserController.getNameById(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+    });
+  });
 });

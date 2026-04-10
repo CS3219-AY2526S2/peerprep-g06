@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAppStore, Difficulty } from '@/store/useAppStore';
 import { topics, languages } from '@/lib/mockData';
-import { Code2, LogOut, CheckCircle2, Shield, BookOpen } from 'lucide-react';
+import { Code2, LogOut, CheckCircle2, Shield, BookOpen, Clock} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { DIFFICULTIES } from '../../../shared/constants';
@@ -82,6 +82,13 @@ export const MatchingSetup = () => {
                 <span className="text-sm font-medium text-primary">Questions</span>
               </button>
             )}
+            <button
+              onClick={() => navigate('/history')}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 hover:bg-primary/20 hover:border-primary/40 transition-all duration-200"
+            >
+              <Clock className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-primary">History</span>
+            </button>
             <span
               className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
               onClick={() => navigate('/account')}
