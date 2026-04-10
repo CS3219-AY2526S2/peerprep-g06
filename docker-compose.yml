@@ -1,6 +1,20 @@
 # local development stack only
 # prod deployment handled separately through AWS infrastructure
 services:
+  nginx:
+    build:
+      context: ./nginx
+    container_name: peerprep-nginx
+    ports:
+      - '${NGINX_PORT:-8080}:80'
+    depends_on:
+      - user-service
+      - question-service
+      - matching-service
+      - collaboration-service
+    networks:
+      - peerprep-network
+
   user-service:
     build:
       context: ./services/user-service

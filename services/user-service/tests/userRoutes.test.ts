@@ -34,16 +34,17 @@ describe('User Routes', () => {
   beforeEach(() => {
     app = express();
     app.use(express.json());
+    app.get('/health', UserController.healthCheck as express.RequestHandler);
     app.use('/users', userRoutes);
     vi.clearAllMocks();
   });
 
-  describe('GET /users/health', () => {
+  describe('GET /health', () => {
     it('should call UserController.healthCheck', async () => {
       (UserController.healthCheck as Mock).mockImplementation((req, res) =>
         res.json({ status: 'User service is running' }),
       );
-      const res = await request(app).get('/users/health');
+      const res = await request(app).get('/health');
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ status: 'User service is running' });
       expect(UserController.healthCheck).toHaveBeenCalled();

@@ -4,7 +4,8 @@ import { MatchFoundPayload } from '../../../shared/types';
 
 export type MatchmakingStatus = 'idle' | 'connecting' | 'queued' | 'matched' | 'timeout' | 'error';
 
-const MATCHING_WS_URL = import.meta.env.VITE_MATCHING_WS_URL || 'http://localhost:3003';
+const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:8080';
+const MATCHING_WS_PATH = import.meta.env.VITE_MATCHING_WS_PATH || '/socket.io';
 const DEFAULT_TIMEOUT = 30;
 
 interface JoinQueueParams {
@@ -64,8 +65,9 @@ export function useMatchmaking() {
       setMatchData(null);
       setError(null);
 
-      const socket = io(MATCHING_WS_URL, {
+      const socket = io(GATEWAY_URL, {
         transports: ['websocket'],
+        path: MATCHING_WS_PATH,
       });
       socketRef.current = socket;
 

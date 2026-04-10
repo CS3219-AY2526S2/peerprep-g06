@@ -10,7 +10,7 @@ PeerPrep consists of a static frontend, four backend services, and three externa
 
 The application is deployed in two shapes:
 
-- local development: Docker Compose for backend services and RabbitMQ, plus a separately started frontend
+- local development: Docker Compose for Nginx, backend services, and RabbitMQ, plus a separately started frontend
 - cloud deployment: S3 and CloudFront for the frontend, ECS Fargate for backend services, and Nginx as the public API gateway
 
 ## Application Architecture
@@ -75,6 +75,7 @@ Redis and RabbitMQ serve different purposes:
 
 Local backend development uses [`docker-compose.yml`](../docker-compose.yml). The Compose stack starts:
 
+- `nginx` on `8080` by default
 - `user-service` on `3001`
 - `question-service` on `3002`
 - `matching-service` on `3003`
@@ -85,6 +86,7 @@ Local backend development uses [`docker-compose.yml`](../docker-compose.yml). Th
 Redis remains external in local development. `matching-service` and `collaboration-service` both connect to the Redis instance described in the root `.env`.
 
 The frontend runs separately with `npm run dev` from [`frontend/`](../frontend/).
+When using the gateway locally, the frontend should point its API and Socket.IO URLs at Nginx instead of the individual backend service ports.
 
 ### Local container build model
 
@@ -195,6 +197,7 @@ The file [.env.example](../.env.example) defines the variables used by Docker Co
 Required categories:
 
 - local published ports:
+  - `NGINX_PORT`
   - `USER_SERVICE_PORT`
   - `QUESTION_SERVICE_PORT`
   - `MATCHING_SERVICE_PORT`
@@ -224,10 +227,9 @@ Required categories:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `VITE_USER_SERVICE_URL`
-- `VITE_QUESTION_SERVICE_URL`
-- `VITE_MATCHING_WS_URL`
-- `VITE_COLLAB_WS_URL`
+- `VITE_GATEWAY_URL`
+- `VITE_MATCHING_WS_PATH`
+- `VITE_COLLAB_WS_PATH`
 
 These are public build-time values and are safe to expose to the browser.
 
