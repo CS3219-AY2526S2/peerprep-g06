@@ -82,6 +82,43 @@ describe('Group C: Redis-Dependent', () => {
     expect(members).not.toContain('user-timeout');
   }, 15000);
 
+  it('should ignore non-request key expiry events', async () => {
+    const client1 = await createConnectedClient(server.port);
+
+    // Set a non-request key with a short TTL — sessionManager should ignore it
+    await redis.set('lock:match:some-user', '1', { EX: 1 });
+
+    // No timeout event should fire for this key
+    let timedOut = false;
+    client1.on('timeout', () => { timedOut = true; });
+    await new Promise((r) => setTimeout(r, 3000));
+    expect(timedOut).toBe(false);
+  }, 10000);
+
+  it('should handle timeout gracefully when queue key is already deleted', async () => {
+    const client1 = await createConnectedClient(server.port);
+
+    client1.emit('join_queue', {
+      userId: 'user-orphan',
+      difficulty: 'easy',
+      topics: ['arrays'],
+      language: 'javascript',
+    });
+
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Manually delete the queues:<userId> key to simulate it being already cleaned up
+    await redis.del('queues:user-orphan');
+
+    // Wait for TTL expiry — handleTimeout should not crash, just log a warning
+    await new Promise((r) => setTimeout(r, 4000));
+
+    // If we got here without the server crashing, the graceful handling worked
+    // The user should still be in the sorted set (since we only deleted the membership key)
+    const members = await redis.zRange('queue:easy:javascript', 0, -1);
+    expect(members).toContain('user-orphan');
+  }, 10000);
+
   it('should match users via matchmaking interval when eager match misses', async () => {
     // User A joins first
     const client1 = await createConnectedClient(server.port);

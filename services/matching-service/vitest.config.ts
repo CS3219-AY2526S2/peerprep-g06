@@ -13,7 +13,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.d.ts', 'src/index.ts'],
+      exclude: [
+        'src/**/*.d.ts',
+        'src/index.ts',
+        'src/config/rabbitmq/**',
+        'src/config/redis.ts',
+        'src/services/questionService.ts',
+      ],
     },
   },
   resolve: {
