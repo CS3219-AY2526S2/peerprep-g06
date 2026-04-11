@@ -18,11 +18,7 @@ vi.mock('../src/services/questionService', () => ({
 }));
 
 import { TestServer, startTestServer, flushRedis } from './helpers/server';
-import {
-  createConnectedClient,
-  waitForEvent,
-  disconnectAll,
-} from './helpers/client';
+import { createConnectedClient, waitForEvent, disconnectAll } from './helpers/client';
 
 let server: TestServer;
 
@@ -53,7 +49,10 @@ describe('Group D: Concurrency', () => {
     // Collect all match_found events
     const matches: Array<{ userId: string; matchId: string; peerId: string }> = [];
 
-    const collectMatch = (userId: string, client: ReturnType<typeof createConnectedClient> extends Promise<infer T> ? T : never) => {
+    const collectMatch = (
+      userId: string,
+      client: ReturnType<typeof createConnectedClient> extends Promise<infer T> ? T : never,
+    ) => {
       return waitForEvent<{ matchId: string; peerId: string }>(client, 'match_found', 10000)
         .then((data) => {
           matches.push({ userId, matchId: data.matchId, peerId: data.peerId });

@@ -27,11 +27,7 @@ vi.mock('../src/types/constants', async (importOriginal) => {
 });
 
 import { TestServer, startTestServer, flushRedis } from './helpers/server';
-import {
-  createConnectedClient,
-  waitForEvent,
-  disconnectAll,
-} from './helpers/client';
+import { createConnectedClient, waitForEvent, disconnectAll } from './helpers/client';
 import { redis } from '../src/config/redis';
 
 let server: TestServer;
@@ -90,7 +86,9 @@ describe('Group C: Redis-Dependent', () => {
 
     // No timeout event should fire for this key
     let timedOut = false;
-    client1.on('timeout', () => { timedOut = true; });
+    client1.on('timeout', () => {
+      timedOut = true;
+    });
     await new Promise((r) => setTimeout(r, 3000));
     expect(timedOut).toBe(false);
   }, 10000);

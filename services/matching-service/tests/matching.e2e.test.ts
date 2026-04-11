@@ -18,11 +18,7 @@ vi.mock('../src/services/questionService', () => ({
 }));
 
 import { TestServer, startTestServer, flushRedis } from './helpers/server';
-import {
-  createConnectedClient,
-  waitForEvent,
-  disconnectAll,
-} from './helpers/client';
+import { createConnectedClient, waitForEvent, disconnectAll } from './helpers/client';
 import { publishEvent } from '../src/config/rabbitmq';
 import { redis } from '../src/config/redis';
 import { Socket } from 'socket.io-client';
@@ -100,15 +96,19 @@ describe('Group A: Happy Paths', () => {
     expect(match1.question.id).toBe('q1');
 
     // publishEvent should have been called for match.found
-    expect(publishEvent).toHaveBeenCalledWith('match', 'found', expect.objectContaining({
-      matchFound: expect.objectContaining({
-        user1Id: expect.any(String),
-        user2Id: expect.any(String),
-        difficulty: 'easy',
-        topic: 'arrays',
-        language: 'javascript',
+    expect(publishEvent).toHaveBeenCalledWith(
+      'match',
+      'found',
+      expect.objectContaining({
+        matchFound: expect.objectContaining({
+          user1Id: expect.any(String),
+          user2Id: expect.any(String),
+          difficulty: 'easy',
+          topic: 'arrays',
+          language: 'javascript',
+        }),
       }),
-    }));
+    );
   });
 
   it('should not emit match_found when only one user is in queue', async () => {
@@ -123,7 +123,9 @@ describe('Group A: Happy Paths', () => {
 
     // Wait and verify no match_found fires
     let matched = false;
-    client1.on('match_found', () => { matched = true; });
+    client1.on('match_found', () => {
+      matched = true;
+    });
     await new Promise((r) => setTimeout(r, 1000));
     expect(matched).toBe(false);
 
@@ -221,8 +223,12 @@ describe('Group B: Edge Cases', () => {
 
     // Wait and verify no match_found fires for either user
     let matched = false;
-    client1.on('match_found', () => { matched = true; });
-    client2.on('match_found', () => { matched = true; });
+    client1.on('match_found', () => {
+      matched = true;
+    });
+    client2.on('match_found', () => {
+      matched = true;
+    });
     await new Promise((r) => setTimeout(r, 1500));
     expect(matched).toBe(false);
 
