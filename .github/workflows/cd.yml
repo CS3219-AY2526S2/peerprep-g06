@@ -68,3 +68,43 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/peerprep/${{ matrix.service }}:${{ github.sha }}
+
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_USER_SERVICE_URL: ${{ secrets.VITE_USER_SERVICE_URL }}
+          VITE_QUESTION_SERVICE_URL: ${{ secrets.VITE_QUESTION_SERVICE_URL }}
+          VITE_MATCHING_WS_URL: ${{ secrets.VITE_MATCHING_WS_URL }}
+          VITE_COLLAB_WS_URL: ${{ secrets.VITE_COLLAB_WS_URL }}
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
