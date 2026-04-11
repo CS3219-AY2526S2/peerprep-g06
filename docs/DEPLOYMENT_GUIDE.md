@@ -356,25 +356,135 @@ This verifies that each deployable backend image can be built successfully from 
 
 ## CD Pipeline
 
-The CD pipeline is not yet implemented in the repository. The deployment flow is structured as follows.
+The CD pipeline is defined in [`.github/workflows/cd.yml`](../.github/workflows/cd.yml).
+
+### Trigger
+
+The workflow runs in two modes:
+
+- automatically after the CI workflow completes successfully on `main`
+- manually via workflow dispatch in the GitHub Actions UI
+
+The automatic trigger uses `workflow_run` to chain CI and CD. The workflow checks that CI concluded successfully before proceeding. Manual dispatch bypasses this check for re-deploys.
+
+A concurrency group (`cd-production`) prevents overlapping deploys. If a second deploy is triggered while one is running, it queues rather than cancels the in-progress deploy.
+
+### Authentication
+
+The workflow authenticates with AWS using OIDC federation. GitHub Actions assumes an IAM role directly without stored long-lived credentials.
+
+Required permissions:
+
+- `id-token: write` for OIDC token exchange
+- `contents: read` for repository checkout
+
+### Job structure
+
+The workflow has four jobs:
+
+```
+build-backend ──> deploy-backend
+                                   (independent)
+build-frontend ─> deploy-frontend
+```
+
+The two build jobs run in parallel. Each deploy job runs after its corresponding build job completes.
 
 ### Backend CD flow
 
-1. Build production images for:
-   - `user-service`
-   - `question-service`
-   - `matching-service`
-   - `collaboration-service`
-   - `nginx`
-2. Push images to ECR.
-3. Update ECS task definitions with the new image tags.
-4. Roll the ECS services forward and wait for service stability.
+#### Build phase
+
+The `build-backend` job builds all five container images in parallel using a matrix strategy:
+
+| Service                 | Docker context                   | Dockerfile                                  |
+| ----------------------- | -------------------------------- | ------------------------------------------- |
+| `user-service`          | `services/user-service`          | `services/user-service/Dockerfile`          |
+| `question-service`      | `services/question-service`      | `services/question-service/Dockerfile`      |
+| `matching-service`      | `.` (repo root)                  | `services/matching-service/Dockerfile`      |
+| `collaboration-service` | `services/collaboration-service` | `services/collaboration-service/Dockerfile` |
+| `nginx`                 | `nginx`                          | `nginx/Dockerfile`                          |
+
+`matching-service` uses the repository root as its Docker context because its Dockerfile copies shared modules from the `shared/` directory.
+
+Each image is tagged with the git commit SHA and pushed to ECR:
+
+```
+<account-id>.dkr.ecr.<region>.amazonaws.com/peerprep/<service>:<git-sha>
+```
+
+#### Deploy phase
+
+The `deploy-backend` job deploys all five ECS services sequentially in this order:
+
+1. `nginx`
+2. `user-service`
+3. `question-service`
+4. `matching-service`
+5. `collaboration-service`
+
+Infrastructure goes first, then stateless services, then services with Redis and RabbitMQ dependencies.
+
+For each service, the deploy:
+
+1. Fetches the current ECS task definition
+2. Renders a new task definition revision with the updated image tag
+3. Registers the new task definition and updates the ECS service
+4. Waits for ECS service stability before proceeding to the next service
 
 ### Frontend CD flow
 
-1. Build the frontend with production `VITE_*` configuration.
-2. Upload the generated assets to S3.
-3. Invalidate the CloudFront cache so the new frontend is served immediately.
+#### Build phase
+
+The `build-frontend` job:
+
+1. Checks out the repository
+2. Sets up Node 24
+3. Installs dependencies with `npm ci`
+4. Builds the frontend with production `VITE_*` environment variables injected from GitHub secrets
+5. Uploads the `frontend/dist/` output as a workflow artifact
+
+#### Deploy phase
+
+The `deploy-frontend` job:
+
+1. Downloads the build artifact
+2. Syncs the assets to S3 with `aws s3 sync --delete`
+3. Invalidates the CloudFront cache with path `/*`
+
+The `--delete` flag removes stale assets from S3 that are no longer part of the build output.
+
+### GitHub configuration
+
+The following must be configured in the repository's GitHub settings.
+
+#### Secrets
+
+| Secret                       | Purpose                                        |
+| ---------------------------- | ---------------------------------------------- |
+| `AWS_ROLE_ARN`               | IAM role for OIDC federation                   |
+| `CLOUDFRONT_DISTRIBUTION_ID` | CloudFront distribution for cache invalidation |
+| `VITE_SUPABASE_URL`          | Frontend build-time Supabase URL               |
+| `VITE_SUPABASE_ANON_KEY`     | Frontend build-time Supabase anon key          |
+| `VITE_USER_SERVICE_URL`      | Frontend build-time user service URL           |
+| `VITE_QUESTION_SERVICE_URL`  | Frontend build-time question service URL       |
+| `VITE_MATCHING_WS_URL`       | Frontend build-time matching WebSocket URL     |
+| `VITE_COLLAB_WS_URL`         | Frontend build-time collab WebSocket URL       |
+
+#### Variables
+
+| Variable         | Purpose            |
+| ---------------- | ------------------ |
+| `AWS_REGION`     | AWS region         |
+| `AWS_ACCOUNT_ID` | AWS account number |
+
+### AWS resource naming
+
+The workflow uses the following provisional resource names. These are defined in the workflow's top-level `env` block and can be updated to match the actual infrastructure.
+
+- ECR repositories: `peerprep/user-service`, `peerprep/question-service`, `peerprep/matching-service`, `peerprep/collaboration-service`, `peerprep/nginx`
+- ECS cluster: `peerprep`
+- ECS services: `peerprep-user-service`, `peerprep-question-service`, `peerprep-matching-service`, `peerprep-collaboration-service`, `peerprep-nginx`
+- S3 bucket: `peerprep-frontend`
 
 ### Platform requirements for CD
 
@@ -384,7 +494,7 @@ The CD workflow depends on:
 - an ECS cluster and ECS services
 - an S3 bucket for frontend assets
 - a CloudFront distribution
-- IAM permissions for GitHub Actions
+- an IAM role with an OIDC trust policy scoped to this repository
 - external Redis, RabbitMQ, and Supabase endpoints available to the runtime services
 
 ## Operational Summary
