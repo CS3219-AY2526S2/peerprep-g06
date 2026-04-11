@@ -9,3 +9,7 @@ dist
 # Test coverage
 coverage/
 *.lcov
+
+# Working artifacts
+docs/superpowers/
+.superset/

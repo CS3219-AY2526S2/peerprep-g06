@@ -12,35 +12,40 @@ import { registerHandlers, startMatchmakingInterval } from './handlers/matchingH
 // load environment variables
 dotenv.config();
 
-const app = express();
-const server = createServer(app);
-const io = new Server(server, {
-  cors: {
-    // TODO: configure to frontend url when deployed
-    origin: '*',
-    methods: ['GET', 'POST'],
-  },
-});
+export function createApp() {
+  const app = express();
+  const server = createServer(app);
+  const io = new Server(server, {
+    cors: {
+      // TODO: configure to frontend url when deployed
+      origin: '*',
+      methods: ['GET', 'POST'],
+    },
+  });
 
-// middleware
-app.use(cors());
-app.use(express.json());
+  // middleware
+  app.use(cors());
+  app.use(express.json());
 
-// basic health check route
-app.get('/health', (req, res) => {
-  res.status(200).json({ message: 'Matching service is running' });
-});
+  // basic health check route
+  app.get('/health', (req, res) => {
+    res.status(200).json({ message: 'Matching service is running' });
+  });
 
-// socket.io connection handler
-io.on('connection', (socket) => {
-  logger.info(`User connected: ${socket.id}`);
-  registerHandlers(io, socket);
-});
+  // socket.io connection handler
+  io.on('connection', (socket) => {
+    logger.info(`User connected: ${socket.id}`);
+    registerHandlers(io, socket);
+  });
+
+  return { app, server, io };
+}
 
 const PORT = process.env.PORT || 3003;
 
 async function startServer() {
   try {
+    const { server, io } = createApp();
     await connectRedis();
     await setupRedisSubscription();
     await setupSessionManager(io);
@@ -56,4 +61,7 @@ async function startServer() {
   }
 }
 
-startServer();
+// only start when running directly, not when imported by tests
+if (!process.env.VITEST) {
+  startServer();
+}
