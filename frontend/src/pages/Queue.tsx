@@ -1,10 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { QueueRing } from '@/components/QueueRing';
 import { useCollabNotifications } from '@/hooks/useCollabNotifications';
 import { useAppStore } from '@/store/useAppStore';
 import { useMatchmaking } from '@/hooks/useMatchmaking';
 import { useAuth } from '@/contexts/AuthContext';
+
+type QueuePhase = 'queue' | 'matched' | 'entering-session';
+
+const MATCH_FOUND_DELAY_MS = 2000;
 
 const Queue = () => {
   const navigate = useNavigate();
@@ -14,8 +19,6 @@ const Queue = () => {
     selectedTopic,
     selectedLanguage,
     pendingSession,
-    collabNotificationStatus,
-    collabError,
     setCurrentState,
     clearPendingSession,
     resetMatching,
@@ -24,7 +27,10 @@ const Queue = () => {
   const { joinQueue, cancelQueue, status, matchData, error, timeLeft } = useMatchmaking();
   useCollabNotifications(user?.id);
 
-  // join queue on mount
+  const [phase, setPhase] = useState<QueuePhase>('queue');
+  const matchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Join queue on mount
   useEffect(() => {
     if (!user || !selectedDifficulty || !selectedTopic || !selectedLanguage) {
       navigate('/match');
@@ -40,18 +46,32 @@ const Queue = () => {
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // When match is found, show ring burst for 2s then transition to entering-session
   useEffect(() => {
-    if (status === 'matched' && matchData) {
-      console.log('Match found:', matchData);
+    if (status === 'matched' && phase === 'queue') {
+      setPhase('matched');
+      matchTimerRef.current = setTimeout(() => {
+        setPhase('entering-session');
+      }, MATCH_FOUND_DELAY_MS);
     }
-  }, [status, matchData]);
+  }, [status, phase]);
 
+  // Clean up match timer on unmount only
   useEffect(() => {
-    if (pendingSession && status === 'matched') {
+    return () => {
+      if (matchTimerRef.current) {
+        clearTimeout(matchTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Navigate to session once pendingSession arrives and ring burst has played
+  useEffect(() => {
+    if (pendingSession && phase === 'entering-session') {
       setCurrentState('session');
       navigate(`/session/${pendingSession.sessionId}`);
     }
-  }, [navigate, pendingSession, setCurrentState, status]);
+  }, [navigate, pendingSession, phase, setCurrentState]);
 
   const handleCancel = () => {
     cancelQueue();
@@ -63,61 +83,73 @@ const Queue = () => {
     navigate('/match');
   };
 
+  const handleChangePreferences = () => {
+    navigate('/match');
+  };
+
+  // Map status + phase to QueueRing state
+  const ringState = (() => {
+    if (phase === 'matched') return 'matched' as const;
+    if (phase === 'entering-session') return 'entering-session' as const;
+    if (status === 'connecting' || status === 'queued') return 'searching' as const;
+    return 'idle' as const;
+  })();
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center max-w-md mx-auto px-6">
-        {/* Connecting / Queued */}
-        {(status === 'connecting' || status === 'queued') && (
-          <div className="animate-fade-in">
-            <div className="text-6xl font-bold text-primary mb-4">{timeLeft}</div>
-            <h2 className="text-xl font-semibold mb-2">Searching for a match...</h2>
-            <p className="text-muted-foreground mb-2">
+        {/* Searching */}
+        {phase === 'queue' && (status === 'connecting' || status === 'queued') && (
+          <div className="flex flex-col items-center animate-fade-in">
+            <QueueRing state={ringState} timeLeft={timeLeft} />
+            <h2 className="text-xl font-semibold mt-6 mb-2">Searching for a match...</h2>
+            <p className="text-muted-foreground mb-8">
               {selectedDifficulty} / {selectedTopic} / {selectedLanguage}
             </p>
-            <p className="text-sm text-muted-foreground mb-8">
-              Please wait while we find you a coding partner.
-            </p>
-            <p className="text-sm text-muted-foreground mb-2">
-              Collaboration notifications: {collabNotificationStatus}
-            </p>
-            {collabError && <p className="text-sm text-red-500 mb-6">{collabError}</p>}
             <Button variant="ghost" onClick={handleCancel}>
               Cancel
             </Button>
           </div>
         )}
 
-        {/* Matched */}
-        {status === 'matched' && matchData && (
-          <div className="animate-fade-in">
-            <h2 className="text-2xl font-bold text-green-500 mb-4">Match Found!</h2>
-            <p className="text-muted-foreground mb-2">Question: {matchData.question.title}</p>
-            <p className="text-sm text-muted-foreground mb-8">
-              {matchData.difficulty} / {matchData.topic} / {matchData.language}
-            </p>
-            <p className="text-sm text-muted-foreground mb-2">Setting up session...</p>
-            <p className="text-sm text-muted-foreground">
-              Collaboration notifications: {collabNotificationStatus}
-            </p>
-            {collabError && <p className="text-sm text-red-500 mt-4">{collabError}</p>}
+        {/* Match Found */}
+        {phase === 'matched' && matchData && (
+          <div className="flex flex-col items-center animate-fade-in">
+            <QueueRing state={ringState} />
+            {matchData.question && (
+              <p className="text-muted-foreground mt-6">{matchData.question.title}</p>
+            )}
+          </div>
+        )}
+
+        {/* Entering Session */}
+        {phase === 'entering-session' && (
+          <div className="flex flex-col items-center animate-fade-in">
+            <QueueRing state={ringState} />
+            <p className="text-muted-foreground mt-6">Setting up your workspace...</p>
           </div>
         )}
 
         {/* Timeout */}
-        {status === 'timeout' && (
+        {status === 'timeout' && phase === 'queue' && (
           <div className="animate-fade-in">
             <h2 className="text-xl font-semibold mb-4">No match found</h2>
             <p className="text-muted-foreground mb-8">
-              We couldn't find a match in time. Try again or adjust your preferences.
+              Try changing your preferences or retry with the same settings.
             </p>
-            <Button variant="hero" onClick={handleRetry}>
-              Try Again
-            </Button>
+            <div className="flex gap-3 justify-center">
+              <Button variant="hero" onClick={handleChangePreferences}>
+                Change Preferences
+              </Button>
+              <Button variant="ghost" onClick={handleRetry}>
+                Retry
+              </Button>
+            </div>
           </div>
         )}
 
         {/* Error */}
-        {status === 'error' && (
+        {status === 'error' && phase === 'queue' && (
           <div className="animate-fade-in">
             <h2 className="text-xl font-semibold text-red-500 mb-4">Something went wrong</h2>
             <p className="text-muted-foreground mb-8">{error || 'An unexpected error occurred.'}</p>
