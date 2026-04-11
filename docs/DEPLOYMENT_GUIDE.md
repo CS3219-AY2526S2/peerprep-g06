@@ -394,13 +394,13 @@ The two build jobs run in parallel. Each deploy job runs after its corresponding
 
 The `build-backend` job builds all five container images in parallel using a matrix strategy:
 
-| Service                | Docker context              | Dockerfile                             |
-| ---------------------- | --------------------------- | -------------------------------------- |
-| `user-service`         | `services/user-service`     | `services/user-service/Dockerfile`     |
-| `question-service`     | `services/question-service` | `services/question-service/Dockerfile` |
-| `matching-service`     | `.` (repo root)             | `services/matching-service/Dockerfile` |
-| `collaboration-service`| `services/collaboration-service` | `services/collaboration-service/Dockerfile` |
-| `nginx`                | `nginx`                     | `nginx/Dockerfile`                     |
+| Service                 | Docker context                   | Dockerfile                                  |
+| ----------------------- | -------------------------------- | ------------------------------------------- |
+| `user-service`          | `services/user-service`          | `services/user-service/Dockerfile`          |
+| `question-service`      | `services/question-service`      | `services/question-service/Dockerfile`      |
+| `matching-service`      | `.` (repo root)                  | `services/matching-service/Dockerfile`      |
+| `collaboration-service` | `services/collaboration-service` | `services/collaboration-service/Dockerfile` |
+| `nginx`                 | `nginx`                          | `nginx/Dockerfile`                          |
 
 `matching-service` uses the repository root as its Docker context because its Dockerfile copies shared modules from the `shared/` directory.
 
@@ -457,23 +457,23 @@ The following must be configured in the repository's GitHub settings.
 
 #### Secrets
 
-| Secret                       | Purpose                                    |
-| ---------------------------- | ------------------------------------------ |
-| `AWS_ROLE_ARN`               | IAM role for OIDC federation               |
+| Secret                       | Purpose                                        |
+| ---------------------------- | ---------------------------------------------- |
+| `AWS_ROLE_ARN`               | IAM role for OIDC federation                   |
 | `CLOUDFRONT_DISTRIBUTION_ID` | CloudFront distribution for cache invalidation |
-| `VITE_SUPABASE_URL`          | Frontend build-time Supabase URL           |
-| `VITE_SUPABASE_ANON_KEY`     | Frontend build-time Supabase anon key      |
-| `VITE_USER_SERVICE_URL`      | Frontend build-time user service URL       |
-| `VITE_QUESTION_SERVICE_URL`  | Frontend build-time question service URL   |
-| `VITE_MATCHING_WS_URL`       | Frontend build-time matching WebSocket URL |
-| `VITE_COLLAB_WS_URL`         | Frontend build-time collab WebSocket URL   |
+| `VITE_SUPABASE_URL`          | Frontend build-time Supabase URL               |
+| `VITE_SUPABASE_ANON_KEY`     | Frontend build-time Supabase anon key          |
+| `VITE_USER_SERVICE_URL`      | Frontend build-time user service URL           |
+| `VITE_QUESTION_SERVICE_URL`  | Frontend build-time question service URL       |
+| `VITE_MATCHING_WS_URL`       | Frontend build-time matching WebSocket URL     |
+| `VITE_COLLAB_WS_URL`         | Frontend build-time collab WebSocket URL       |
 
 #### Variables
 
-| Variable         | Purpose              |
-| ---------------- | -------------------- |
-| `AWS_REGION`     | AWS region            |
-| `AWS_ACCOUNT_ID` | AWS account number    |
+| Variable         | Purpose            |
+| ---------------- | ------------------ |
+| `AWS_REGION`     | AWS region         |
+| `AWS_ACCOUNT_ID` | AWS account number |
 
 ### AWS resource naming
 
