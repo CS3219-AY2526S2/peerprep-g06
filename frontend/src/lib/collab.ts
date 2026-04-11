@@ -15,7 +15,8 @@ export type {
   SessionReadyPayload,
 } from '../../../shared/types';
 
-const COLLAB_WS_URL = import.meta.env.VITE_COLLAB_WS_URL || 'http://localhost:3004';
+const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:8080';
+const COLLAB_WS_PATH = import.meta.env.VITE_COLLAB_WS_PATH || '/socket.io';
 
 export type NotificationSocket = Socket<
   CollaborationSocketServerToClientEvents,
@@ -40,8 +41,9 @@ export async function getCollabAccessToken(): Promise<string> {
 }
 
 export function createNotificationSocket(accessToken: string): NotificationSocket {
-  return io(COLLAB_WS_URL, {
+  return io(GATEWAY_URL, {
     transports: ['websocket'],
+    path: COLLAB_WS_PATH,
     auth: {
       token: accessToken,
     },
@@ -54,8 +56,9 @@ export function createSessionSocket(
   joinToken: string,
   reconnectAttempts: number,
 ): SessionSocket {
-  return io(`${COLLAB_WS_URL}/session`, {
+  return io(`${GATEWAY_URL}/session`, {
     transports: ['websocket'],
+    path: COLLAB_WS_PATH,
     reconnection: true,
     reconnectionAttempts: reconnectAttempts,
     reconnectionDelay: 1000,

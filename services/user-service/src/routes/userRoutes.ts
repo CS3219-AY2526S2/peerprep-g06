@@ -5,7 +5,6 @@ import { authenticate } from '../middleware/authMiddleware';
 
 const router = Router();
 
-router.get('/health', UserController.healthCheck);
 router.get('/profile', UserController.getProfile);
 router.get('/profile/:userId', UserController.getNameById);
 router.post('/:id/admin-request', RequestController.requestAdmin);
