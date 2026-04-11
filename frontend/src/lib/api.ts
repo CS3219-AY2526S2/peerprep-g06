@@ -18,6 +18,7 @@ export const USER_ENDPOINTS = {
 export const QUESTION_ENDPOINTS = {
   health: `${GATEWAY_URL}/questions/health`,
   getAllQuestions: `${GATEWAY_URL}/questions`,
+  getQuestionById: (questionId: string) => `${GATEWAY_URL}/questions/${questionId}`,
   getRandomQuestion: `${GATEWAY_URL}/questions/random`,
   addQuestion: `${GATEWAY_URL}/questions/add`,
   updateQuestion: (questionId: string) => `${GATEWAY_URL}/questions/${questionId}/update`,
