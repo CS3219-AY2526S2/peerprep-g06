@@ -19,3 +19,52 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
   ECS_CLUSTER: peerprep
+
+jobs:
+  build-backend:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: user-service
+            context: services/user-service
+            dockerfile: services/user-service/Dockerfile
+          - service: question-service
+            context: services/question-service
+            dockerfile: services/question-service/Dockerfile
+          - service: matching-service
+            context: .
+            dockerfile: services/matching-service/Dockerfile
+          - service: collaboration-service
+            context: services/collaboration-service
+            dockerfile: services/collaboration-service/Dockerfile
+          - service: nginx
+            context: nginx
+            dockerfile: nginx/Dockerfile
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/peerprep/${{ matrix.service }}:${{ github.sha }}
