@@ -8,6 +8,7 @@ import Queue from './pages/Queue';
 import Account from './pages/Account';
 import DevPanel from './pages/DevPanel';
 import Questions from './pages/Questions';
+import History from './pages/History';
 import Session from './pages/Session';
 
 const App = () => {
@@ -67,6 +68,15 @@ const App = () => {
         element={
           <ProtectedRoute>
             <Questions />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/history"
+        element={
+          <ProtectedRoute>
+            <History />
           </ProtectedRoute>
         }
       />

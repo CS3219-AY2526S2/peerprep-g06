@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   getAllQuestions,
-  getRandomQuestion,
+  getQuestionById,
   getRandomQuestionByFilter,
   addQuestion,
   updateQuestion,
@@ -13,7 +13,7 @@ const router = Router();
 
 // Public read routes
 router.get('/', getAllQuestions);
-router.get('/random', getRandomQuestion);
+router.get('/:id', getQuestionById);
 router.get('/random/:difficulty/:topic', getRandomQuestionByFilter);
 
 // Admin-only write routes

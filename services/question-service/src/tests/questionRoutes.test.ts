@@ -44,24 +44,32 @@ describe('GET /questions', () => {
   });
 });
 
-describe('GET /questions/random', () => {
-  it('returns a random question', async () => {
-    const questions = [{ id: '1' }, { id: '2' }];
+describe('GET /questions/:id', () => {
+  it('returns a question by its ID', async () => {
+    const question = { id: '1', title: 'Two Sum' };
     vi.mocked(supabase.from).mockReturnValueOnce({
-      select: vi.fn().mockResolvedValueOnce({ data: questions, error: null }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: question, error: null }),
+        }),
+      }),
     } as any);
 
-    const res = await request(app).get('/questions/random');
+    const res = await request(app).get('/questions/1');
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('id');
+    expect(res.body).toEqual(question);
   });
 
   it('returns 404 when no questions exist', async () => {
     vi.mocked(supabase.from).mockReturnValueOnce({
-      select: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      }),
     } as any);
 
-    const res = await request(app).get('/questions/random');
+    const res = await request(app).get('/questions/99999');
     expect(res.status).toBe(404);
   });
 });

@@ -55,8 +55,8 @@ jobs:
           - name: matching-service
             path: services/matching-service
             lockfile: services/matching-service/package-lock.json
-            run_tests: false
-            run_coverage: false
+            run_tests: true
+            run_coverage: true
           - name: collaboration-service
             path: services/collaboration-service
             lockfile: services/collaboration-service/package-lock.json
