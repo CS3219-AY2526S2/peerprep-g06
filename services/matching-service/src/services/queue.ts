@@ -1,5 +1,5 @@
 import { redis } from '../config/redis';
-import { Match, MatchStatus, Difficulty } from '@shared/types';
+import { Match, MatchStatus, Difficulty } from '../../../../shared/types';
 import { User } from '../types/user';
 import {
   MATCH_LOCK_TTL,

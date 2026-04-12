@@ -8,7 +8,7 @@ import {
   getQueueKey,
   setUserMatched,
 } from './queue';
-import { Match, MatchStatus } from '@shared/types';
+import { Match, MatchStatus } from '../../../../shared/types';
 import { User } from '../types/user';
 import { logger } from '../utils/logger';
 import { getRandomQuestion } from './questionService';
