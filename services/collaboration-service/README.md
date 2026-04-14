@@ -150,3 +150,7 @@ If clients fail to join `/session`:
 ```bash
 docker logs peerprep-collaboration-service
 ```
+
+## Additional Documentation
+
+- Full architecture & lifecycle: `docs/collaboration-service-handover.md`
