@@ -13,3 +13,6 @@ coverage/
 # Working artifacts
 docs/superpowers/
 .superset/
+
+# firebase
+.firebase/
