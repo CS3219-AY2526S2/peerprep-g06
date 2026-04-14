@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { CollaborativeMonacoEditor } from '@/components/CollaborativeMonacoEditor';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCollabSession } from '@/hooks/useCollabSession';
 import { cn } from '@/lib/utils';
@@ -142,6 +143,8 @@ const Session = () => {
   const { user } = useAuth();
   const { pendingSession, collabSessionStatus, collabError, setCurrentState, clearPendingSession } =
     useAppStore();
+  const [showBackConfirmModal, setShowBackConfirmModal] = useState(false);
+  const allowNavigationRef = useRef(false);
 
   const { sharedDoc, joinedSession, participantStatuses, sessionEnded, leaveSession } =
     useCollabSession(pendingSession);
@@ -175,6 +178,24 @@ const Session = () => {
     return () => window.clearTimeout(timeoutId);
   }, [clearPendingSession, navigate, sessionEnded]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      if (allowNavigationRef.current) {
+        return;
+      }
+
+      setShowBackConfirmModal(true);
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
   const participantIds = Array.from(
     new Set(
       [
@@ -193,6 +214,15 @@ const Session = () => {
     leaveSession();
     clearPendingSession();
     navigate('/match', { replace: true });
+  };
+
+  const handleBackConfirm = () => {
+    allowNavigationRef.current = true;
+    setShowBackConfirmModal(false);
+    leaveSession();
+    clearPendingSession();
+    setCurrentState('queue');
+    navigate('/queue', { replace: true });
   };
 
   const connection = getConnectionPresentation(
@@ -375,6 +405,17 @@ const Session = () => {
           </div>
         </div>
       </main>
+
+      <ConfirmModal
+        isOpen={showBackConfirmModal}
+        title="Leave session?"
+        description="If you press back, you will be rejoining the queue. Are you sure you want to continue?"
+        confirmLabel="Continue"
+        cancelLabel="Stay in session"
+        variant="danger"
+        onConfirm={handleBackConfirm}
+        onCancel={() => setShowBackConfirmModal(false)}
+      />
     </div>
   );
 };
