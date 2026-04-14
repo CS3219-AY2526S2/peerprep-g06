@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
-import { Match, MatchStatus, Difficulty, MatchFoundPayload } from '@shared/types';
-import { DIFFICULTIES, LANGUAGES } from '@shared/constants';
+import { Match, MatchStatus, Difficulty, MatchFoundPayload } from '../../../../shared/types';
+import { DIFFICULTIES, LANGUAGES } from '../../../../shared/constants';
 import { User } from '../types/user';
 import {
   addUserToQueue,
