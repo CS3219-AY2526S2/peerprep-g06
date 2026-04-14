@@ -1,4 +1,4 @@
-import { MatchStatus, Difficulty } from '@shared/types';
+import { MatchStatus, Difficulty } from '../../../../shared/types';
 
 export { Difficulty };
 

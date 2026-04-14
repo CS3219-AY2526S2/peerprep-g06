@@ -22,6 +22,11 @@ export async function getQuestionById(req: Request, res: Response) {
 
 export async function getRandomQuestionByFilter(req: Request, res: Response) {
   const { difficulty, topic } = req.params;
+  const startedAt = Date.now();
+
+  console.log(
+    `[question-service] Fetching random question for difficulty="${difficulty}" topic="${topic}"`,
+  );
 
   const { data, error } = await supabase
     .from('questions')
@@ -29,10 +34,25 @@ export async function getRandomQuestionByFilter(req: Request, res: Response) {
     .eq('difficulty', difficulty)
     .contains('topic', [topic]);
 
-  if (error) return res.status(500).json({ error: error.message });
-  if (!data || data.length === 0) return res.status(404).json({ error: 'No questions found' });
+  if (error) {
+    console.error(
+      `[question-service] Failed random question query after ${Date.now() - startedAt}ms`,
+      error,
+    );
+    return res.status(500).json({ error: error.message });
+  }
+
+  if (!data || data.length === 0) {
+    console.warn(
+      `[question-service] No random question found after ${Date.now() - startedAt}ms for difficulty="${difficulty}" topic="${topic}"`,
+    );
+    return res.status(404).json({ error: 'No questions found' });
+  }
 
   const random = data[Math.floor(Math.random() * data.length)];
+  console.log(
+    `[question-service] Random question selected after ${Date.now() - startedAt}ms from ${data.length} candidates`,
+  );
   res.json(random);
 }
 
