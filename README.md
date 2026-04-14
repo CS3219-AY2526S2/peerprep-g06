@@ -21,10 +21,10 @@ The repository is a monorepo containing a Vite frontend, four backend services, 
 - [API Contracts](#api-contracts)
 - [Socket Events](#socket-events)
 - [Environment Configuration](#environment-configuration)
-- [Local Development](#local-development)
+- [Local Deployment](#local-deployment)
 - [Build, Test, and Typecheck](#build-test-and-typecheck)
-- [Docker and Deployment](#docker-and-deployment)
 - [CI/CD](#cicd)
+- [Production Deployment](#production-deployment)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -61,7 +61,6 @@ The repository is a monorepo containing a Vite frontend, four backend services, 
 | `services/collaboration-service/` | Match event consumer + session lifecycle + collaborative editor sync |
 | `nginx/`                          | Gateway routing for HTTP and websocket traffic                       |
 | `shared/`                         | Shared cross-service/frontend contracts and constants                |
-| `docs/DEPLOYMENT_GUIDE.md`        | Detailed local/cloud deployment notes                                |
 | `.github/workflows/`              | CI and CD pipelines                                                  |
 | `docker-compose.yml`              | Local backend stack orchestration                                    |
 
@@ -306,7 +305,7 @@ Start from:
 
 - Ports: `NGINX_PORT`, `USER_SERVICE_PORT`, `QUESTION_SERVICE_PORT`, `MATCHING_SERVICE_PORT`, `COLLAB_SERVICE_PORT`
 - Shared backends: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `RABBITMQ_URL`
-- Collaboration overrides: `COLLAB_FRONTEND_ORIGIN`, `COLLAB_PUBLIC_WS_URL`, `COLLAB_GRACE_PERIOD_MS`, `COLLAB_JOIN_TOKEN_TTL_MS`, `RABBITMQ_MATCH_FOUND_EXCHANGE`, `RABBITMQ_MATCH_FOUND_QUEUE`, `RABBITMQ_MATCH_FOUND_ROUTING_KEY`
+- Collaboration overrides: `FRONTEND_ORIGIN`, `PUBLIC_WS_URL`, `GRACE_PERIOD_MS`, `JOIN_TOKEN_TTL_MS`, `RABBITMQ_MATCH_FOUND_EXCHANGE`, `RABBITMQ_MATCH_FOUND_QUEUE`, `RABBITMQ_MATCH_FOUND_ROUTING_KEY`
 - Logging: `LOG_LEVEL`
 
 ### Frontend `.env.local` keys
@@ -318,194 +317,6 @@ Start from:
 - `VITE_COLLAB_WS_PATH`
 
 ---
-
-## Local Development
-
-### Prerequisites
-
-- Node.js **24.x**
-- npm
-- Docker + Docker Compose
-- Reachable Supabase project
-- Reachable Redis instance
-
-### 1. Install dependencies
-
-```bash
-npm ci
-npm ci --prefix frontend
-npm ci --prefix services/user-service
-npm ci --prefix services/question-service
-npm ci --prefix services/matching-service
-npm ci --prefix services/collaboration-service
-```
-
-### 2. Configure environment files
-
-```bash
-cp .env.example .env
-cp frontend/.env.local.example frontend/.env.local
-cp services/user-service/.env.example services/user-service/.env
-cp services/question-service/.env.example services/question-service/.env
-cp services/matching-service/.env.example services/matching-service/.env
-cp services/collaboration-service/.env.example services/collaboration-service/.env
-```
-
-Fill in your real Supabase/Redis values.
-
-### 3. Start backend stack (gateway + services + RabbitMQ)
-
-```bash
-docker compose up --build
-```
-
-### 4. Start frontend
-
-```bash
-npm run dev --prefix frontend
-```
-
-Frontend default URL: `http://localhost:5173`  
-Gateway default URL: `http://localhost:8080`
-
----
-
-## Build, Test, and Typecheck
-
-### Root-level scripts
-
-```bash
-npm run format:check
-npm run format
-npm run build
-npm run typecheck
-```
-
-Root `build` and `typecheck` run across frontend + all backend services.
-
-### Package-level scripts
-
-### Frontend
-
-```bash
-npm run dev --prefix frontend
-npm run typecheck --prefix frontend
-npm run build --prefix frontend
-```
-
-### User Service
-
-```bash
-npm run dev --prefix services/user-service
-npm run typecheck --prefix services/user-service
-npm run test --prefix services/user-service
-npm run test:coverage --prefix services/user-service
-npm run build --prefix services/user-service
-```
-
-### Question Service
-
-```bash
-npm run dev --prefix services/question-service
-npm run typecheck --prefix services/question-service
-npm run test --prefix services/question-service
-npm run test:coverage --prefix services/question-service
-npm run build --prefix services/question-service
-```
-
-### Matching Service
-
-```bash
-npm run dev --prefix services/matching-service
-npm run typecheck --prefix services/matching-service
-npm run test --prefix services/matching-service
-npm run test:coverage --prefix services/matching-service
-npm run build --prefix services/matching-service
-```
-
-### Collaboration Service
-
-```bash
-npm run dev --prefix services/collaboration-service
-npm run typecheck --prefix services/collaboration-service
-npm run test --prefix services/collaboration-service
-npm run build --prefix services/collaboration-service
-```
-
----
-
-## Docker and Deployment
-
-### Local Docker Compose services
-
-- `nginx`
-- `user-service`
-- `question-service`
-- `matching-service`
-- `collaboration-service`
-- `rabbitmq` (+ management UI on `15672`)
-
-### Dockerfile model
-
-Each backend service uses a multi-stage Dockerfile:
-
-- `dev` stage for local iterative development
-- `build` stage for TypeScript compilation
-- `prod` stage for runtime image
-
-`matching-service` uses repo-root Docker context to include `shared/`.
-
----
-
-## CI/CD
-
-### CI (`.github/workflows/ci.yml`)
-
-1. **Format Check** (`npm run format:check`)
-2. **Package Matrix** (frontend + all services):
-   - `npm ci`
-   - `npm run typecheck`
-   - tests/coverage where configured
-   - `npm run build`
-3. **Docker Build Matrix** for backend images
-
-### CD (`.github/workflows/cd.yml`)
-
-- Triggered by successful CI on `main` or manual dispatch
-- Builds/pushes ECR images for:
-  - `user-service`
-  - `question-service`
-  - `matching-service`
-  - `collaboration-service`
-  - `nginx`
-- Deploys ECS services sequentially
-- Builds frontend and deploys static assets to S3
-- Invalidates CloudFront cache
-
-For full deployment topology and required AWS/GitHub configuration, see `docs/DEPLOYMENT_GUIDE.md`.
-
----
-
-## Troubleshooting
-
-### Common local issues
-
-- **Frontend cannot reach backend**
-  - verify `VITE_GATEWAY_URL` points to gateway (default `http://localhost:8080`)
-- **Matching queue never matches**
-  - verify Redis credentials/connectivity and `QUESTION_SERVICE_URL`
-- **No collaboration session after match**
-  - verify RabbitMQ connection and exchange/queue/routing key alignment between matching and collaboration services
-- **Session reconnect fails quickly**
-  - verify `GRACE_PERIOD_MS` and join token TTL settings
-- **Role-based pages inaccessible**
-  - verify `profiles.role` in Supabase (`user` / `admin` / `developer`)
-
-### Helpful links
-
-- Deployment details: [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md)
-- Matching service notes: `services/matching-service/README.md`, `services/matching-service/docs/`
-- Collaboration service deep-dive: `services/collaboration-service/README.md`
 
 ## Local Deployment
 
@@ -567,11 +378,60 @@ Expected local gateway routes include:
 
 The gateway configuration lives in [`nginx/nginx.conf`](./nginx/nginx.conf).
 
+---
+
+## Build, Test, and Typecheck
+
+### Root-level scripts
+
+```bash
+npm run format:check
+npm run build
+npm run typecheck
+```
+
+### Package-level scripts
+
+```bash
+# Frontend
+npm run dev --prefix frontend
+npm run build --prefix frontend
+
+# Services
+npm run dev --prefix services/user-service
+npm run dev --prefix services/question-service
+npm run dev --prefix services/matching-service
+npm run dev --prefix services/collaboration-service
+```
+
+---
+
+## CI/CD
+
+### CI (`.github/workflows/ci.yml`)
+
+CI runs:
+
+1. Root formatting check (`npm run format:check`)
+2. Matrix package validation (install, typecheck, tests/coverage where configured, build)
+3. Docker image build validation for backend services
+
+### CD (`.github/workflows/cd.yml`)
+
+CD runs on successful CI on `main` (or manual dispatch) and does:
+
+1. Build and push backend images (`user-service`, `question-service`, `matching-service`, `collaboration-service`, `nginx`) to ECR
+2. Deploy ECS services using updated task definitions
+3. Build frontend and deploy assets to S3
+4. Invalidate CloudFront cache
+
+For infrastructure details, refer to this README’s CI/CD and Production Deployment sections and the workflow files in `.github/workflows/`.
+
 ## Production Deployment
 
 PeerPrep is currently deployed in the following shape:
 
-- frontend: Firebase Hosting on `https://neeg06code.com`
+- frontend: static hosting (S3 + CloudFront)
 - backend: AWS ECS Fargate services behind Nginx
 - backend public entrypoint: `https://api.neeg06code.com`
 - backend ingress: ALB -> Nginx -> internal services
@@ -657,21 +517,13 @@ Recommended backend rollout order:
 
 ### Frontend Deployment
 
-Firebase Hosting serves the built output from `frontend/dist`.
-
-Build the production frontend from the repo root:
+Build the production frontend:
 
 ```bash
 npm run build --prefix frontend
 ```
 
-Deploy the static build:
-
-```bash
-firebase deploy --only hosting
-```
-
-The Firebase Hosting configuration lives in [`firebase.json`](./firebase.json).
+Deploy `frontend/dist` to your static hosting target (CD workflow uses S3 sync + CloudFront invalidation).
 
 ### Production Validation
 
@@ -686,3 +538,23 @@ After deployment, validate these in order:
 7. authenticated frontend flow
 8. matchmaking websocket flow
 9. collaboration websocket flow
+
+## Troubleshooting
+
+### Common local issues
+
+- **Frontend cannot reach backend**
+  - verify `VITE_GATEWAY_URL` points to gateway (default `http://localhost:8080`)
+- **Matching queue never matches**
+  - verify Redis credentials/connectivity and `QUESTION_SERVICE_URL`
+- **No collaboration session after match**
+  - verify RabbitMQ connection and exchange/queue/routing key alignment between matching and collaboration services
+- **Session reconnect fails quickly**
+  - verify `GRACE_PERIOD_MS` and join token TTL settings
+- **Role-based pages inaccessible**
+  - verify `profiles.role` in Supabase (`user` / `admin` / `developer`)
+
+### Helpful links
+
+- Matching service notes: `services/matching-service/README.md`, `services/matching-service/docs/`
+- Collaboration service notes: `services/collaboration-service/README.md`
