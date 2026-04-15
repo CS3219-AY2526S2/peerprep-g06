@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { SessionReadyPayload } from '../../../shared/types';
 import { createNotificationSocket, getCollabAccessToken, NotificationSocket } from '@/lib/collab';
 import { useAppStore } from '@/store/useAppStore';
@@ -7,6 +7,15 @@ export function useCollabNotifications(userId?: string) {
   const socketRef = useRef<NotificationSocket | null>(null);
   const activeConnectionIdRef = useRef(0);
   const { setPendingSession, setCollabNotificationStatus, setCollabError } = useAppStore();
+
+  const requestPendingNotifications = useCallback(() => {
+    if (!userId || !socketRef.current?.connected) {
+      return false;
+    }
+
+    socketRef.current.emit('notification:register', { userId });
+    return true;
+  }, [userId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -40,6 +49,7 @@ export function useCollabNotifications(userId?: string) {
           }
 
           setCollabNotificationStatus('connected');
+          socket.emit('notification:register', { userId });
         });
 
         socket.on('session-ready', (payload: SessionReadyPayload) => {
@@ -102,4 +112,8 @@ export function useCollabNotifications(userId?: string) {
       setCollabNotificationStatus('disconnected');
     };
   }, [setCollabError, setCollabNotificationStatus, setPendingSession, userId]);
+
+  return {
+    requestPendingNotifications,
+  };
 }
