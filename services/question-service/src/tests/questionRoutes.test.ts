@@ -100,7 +100,7 @@ describe('GET /questions/random/:difficulty/:topic', () => {
   });
 });
 
-describe('POST /questions/add', () => {
+describe('POST /questions', () => {
   it('creates a question and returns 201', async () => {
     const newQuestion = { id: '1', title: 'Two Sum' };
     vi.mocked(supabase.from).mockReturnValueOnce({
@@ -108,7 +108,7 @@ describe('POST /questions/add', () => {
       select: vi.fn().mockResolvedValueOnce({ data: [newQuestion], error: null }),
     } as any);
 
-    const res = await request(app).post('/questions/add').send({ title: 'Two Sum' });
+    const res = await request(app).post('/questions').send({ title: 'Two Sum' });
 
     expect(res.status).toBe(201);
     expect(res.body).toEqual([newQuestion]);
@@ -120,12 +120,12 @@ describe('POST /questions/add', () => {
       select: vi.fn().mockResolvedValueOnce({ data: null, error: { message: 'Insert failed' } }),
     } as any);
 
-    const res = await request(app).post('/questions/add').send({});
+    const res = await request(app).post('/questions').send({});
     expect(res.status).toBe(500);
   });
 });
 
-describe('PUT /questions/:id/update', () => {
+describe('PUT /questions/:id', () => {
   it('updates a question', async () => {
     const updated = { id: '1', title: 'Updated' };
     vi.mocked(supabase.from).mockReturnValueOnce({
@@ -134,7 +134,7 @@ describe('PUT /questions/:id/update', () => {
       select: vi.fn().mockResolvedValueOnce({ data: [updated], error: null }),
     } as any);
 
-    const res = await request(app).put('/questions/1/update').send({ title: 'Updated' });
+    const res = await request(app).put('/questions/1').send({ title: 'Updated' });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual([updated]);
@@ -147,12 +147,12 @@ describe('PUT /questions/:id/update', () => {
       select: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
     } as any);
 
-    const res = await request(app).put('/questions/nonexistent/update').send({});
+    const res = await request(app).put('/questions/nonexistent').send({});
     expect(res.status).toBe(404);
   });
 });
 
-describe('DELETE /questions/:id/delete', () => {
+describe('DELETE /questions/:id', () => {
   it('deletes a question', async () => {
     const deleted = { id: '1', title: 'Two Sum' };
     vi.mocked(supabase.from).mockReturnValueOnce({
@@ -161,7 +161,7 @@ describe('DELETE /questions/:id/delete', () => {
       select: vi.fn().mockResolvedValueOnce({ data: deleted, error: null }),
     } as any);
 
-    const res = await request(app).delete('/questions/1/delete');
+    const res = await request(app).delete('/questions/1');
     expect(res.status).toBe(200);
     expect(res.body).toEqual(deleted);
   });
@@ -173,7 +173,7 @@ describe('DELETE /questions/:id/delete', () => {
       select: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
     } as any);
 
-    const res = await request(app).delete('/questions/nonexistent/delete');
+    const res = await request(app).delete('/questions/nonexistent');
     expect(res.status).toBe(404);
   });
 });

@@ -226,9 +226,9 @@ Base URL (through gateway): `http://localhost:8080`
 | GET    | `/questions`                           | Get all questions                 |
 | GET    | `/questions/:id`                       | Get one question                  |
 | GET    | `/questions/random/:difficulty/:topic` | Get random filtered question      |
-| POST   | `/questions/add`                       | Add question (admin/developer)    |
-| PUT    | `/questions/:id/update`                | Update question (admin/developer) |
-| DELETE | `/questions/:id/delete`                | Delete question (admin/developer) |
+| POST   | `/questions`                           | Add question (admin/developer)    |
+| PUT    | `/questions/:id`                       | Update question (admin/developer) |
+| DELETE | `/questions/:id`                       | Delete question (admin/developer) |
 
 ---
 
