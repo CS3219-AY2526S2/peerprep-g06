@@ -1,6 +1,6 @@
 # PeerPrep
 
-PeerPrep is a microservice-based interview practice platform where users:
+[PeerPrep](https://neeg06code.com/) is a microservice-based interview practice platform where users:
 
 1. Sign in with Supabase auth
 2. Choose **difficulty + topic + language**
