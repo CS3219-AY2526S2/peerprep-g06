@@ -124,9 +124,8 @@ describe('sessionPersistence', () => {
     };
     redis.multi.mockReturnValue(transaction);
 
-    const { savePendingDelivery, clearPendingDelivery } = await import(
-      '../src/services/sessionPersistence'
-    );
+    const { savePendingDelivery, clearPendingDelivery } =
+      await import('../src/services/sessionPersistence');
 
     await savePendingDelivery({
       userId: 'user-1',

@@ -37,7 +37,8 @@ describe('documentSyncService', () => {
   });
 
   it('returns plain text directly from plain-text snapshots', async () => {
-    const { getPlainTextFromDocumentSnapshot } = await import('../src/services/documentSyncService');
+    const { getPlainTextFromDocumentSnapshot } =
+      await import('../src/services/documentSyncService');
 
     expect(
       getPlainTextFromDocumentSnapshot({
@@ -51,7 +52,8 @@ describe('documentSyncService', () => {
   });
 
   it('decodes persisted Yjs snapshots into plain text', async () => {
-    const { getPlainTextFromDocumentSnapshot } = await import('../src/services/documentSyncService');
+    const { getPlainTextFromDocumentSnapshot } =
+      await import('../src/services/documentSyncService');
 
     expect(
       getPlainTextFromDocumentSnapshot({
@@ -73,9 +75,8 @@ describe('documentSyncService', () => {
       updatedAt: '2026-04-16T00:00:00.000Z',
     });
 
-    const { getDocumentSyncPayload, getPlainTextFromDocumentSnapshot } = await import(
-      '../src/services/documentSyncService'
-    );
+    const { getDocumentSyncPayload, getPlainTextFromDocumentSnapshot } =
+      await import('../src/services/documentSyncService');
 
     const payload = await getDocumentSyncPayload('session-plain');
     expect(payload).toEqual(
@@ -105,9 +106,8 @@ describe('documentSyncService', () => {
   it('applies document updates and can flush them on dispose', async () => {
     getDocumentSnapshot.mockResolvedValueOnce(null);
 
-    const { applyDocumentUpdate, disposeDocument, getDocumentSyncPayload } = await import(
-      '../src/services/documentSyncService'
-    );
+    const { applyDocumentUpdate, disposeDocument, getDocumentSyncPayload } =
+      await import('../src/services/documentSyncService');
 
     const doc = new Y.Doc();
     doc.getText('code').insert(0, 'updated text');

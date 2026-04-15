@@ -8,5 +8,6 @@ echo "=== Tests ==="
 cd services/user-service && npm test && cd ../..
 cd services/question-service && npm test && cd ../..
 cd services/matching-service && npm test && cd ../..
+cd services/collaboration-service && npm test && cd ../..
 
 echo "=== All checks passed ==="

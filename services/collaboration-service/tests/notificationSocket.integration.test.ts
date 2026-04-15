@@ -131,32 +131,30 @@ describe('notificationSocket integration', () => {
 
   it('replays pending notifications again when the client explicitly registers', async () => {
     getSupabaseUser.mockResolvedValueOnce({ id: 'user-1' });
-    listPendingDeliveries
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          userId: 'user-1',
+    listPendingDeliveries.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        userId: 'user-1',
+        sessionId: 'session-2',
+        type: 'session-ready',
+        payload: {
           sessionId: 'session-2',
-          type: 'session-ready',
-          payload: {
-            sessionId: 'session-2',
-            userId: 'user-1',
-            joinToken: 'join-token',
-            gracePeriodMs: 30000,
-            language: 'typescript',
-            question: {
-              id: '7',
-              title: 'Two Sum',
-              description: 'desc',
-              difficulty: 'easy',
-              topic: 'arrays',
-            },
-            websocketUrl: 'ws://localhost:3004',
+          userId: 'user-1',
+          joinToken: 'join-token',
+          gracePeriodMs: 30000,
+          language: 'typescript',
+          question: {
+            id: '7',
+            title: 'Two Sum',
+            description: 'desc',
+            difficulty: 'easy',
+            topic: 'arrays',
           },
-          createdAt: '2026-04-16T00:00:00.000Z',
-          expiresAt: '2026-04-16T00:05:00.000Z',
+          websocketUrl: 'ws://localhost:3004',
         },
-      ]);
+        createdAt: '2026-04-16T00:00:00.000Z',
+        expiresAt: '2026-04-16T00:05:00.000Z',
+      },
+    ]);
 
     const harness = await createIoHarness();
     try {

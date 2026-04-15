@@ -17,7 +17,13 @@ describe('sessionSocket helpers', () => {
     };
 
     expect(
-      isStoredJoinTokenValid('session-1', 'user-1', 'join-token', record, '2026-04-16T00:30:00.000Z'),
+      isStoredJoinTokenValid(
+        'session-1',
+        'user-1',
+        'join-token',
+        record,
+        '2026-04-16T00:30:00.000Z',
+      ),
     ).toBe(true);
   });
 
@@ -34,13 +40,31 @@ describe('sessionSocket helpers', () => {
     };
 
     expect(
-      isStoredJoinTokenValid('session-1', 'user-2', 'join-token', record, '2026-04-16T00:05:00.000Z'),
+      isStoredJoinTokenValid(
+        'session-1',
+        'user-2',
+        'join-token',
+        record,
+        '2026-04-16T00:05:00.000Z',
+      ),
     ).toBe(false);
     expect(
-      isStoredJoinTokenValid('session-1', 'user-1', 'wrong-token', record, '2026-04-16T00:05:00.000Z'),
+      isStoredJoinTokenValid(
+        'session-1',
+        'user-1',
+        'wrong-token',
+        record,
+        '2026-04-16T00:05:00.000Z',
+      ),
     ).toBe(false);
     expect(
-      isStoredJoinTokenValid('session-1', 'user-1', 'join-token', record, '2026-04-16T00:30:00.000Z'),
+      isStoredJoinTokenValid(
+        'session-1',
+        'user-1',
+        'join-token',
+        record,
+        '2026-04-16T00:30:00.000Z',
+      ),
     ).toBe(false);
   });
 
