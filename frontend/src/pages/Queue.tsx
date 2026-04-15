@@ -78,7 +78,7 @@ const Queue = () => {
   };
 
   const handleRetry = () => {
-    if (!user || !selectedDifficulty || !selectedTopic || !selectedLanguage) {
+    if (!user || !selectedDifficulty || selectedTopics.length === 0 || !selectedLanguage) {
       navigate('/match');
       return;
     }
@@ -86,7 +86,7 @@ const Queue = () => {
     joinQueue({
       userId: user.id,
       difficulty: selectedDifficulty,
-      topics: [selectedTopic],
+      topics: selectedTopics,
       language: selectedLanguage,
     });
   };
