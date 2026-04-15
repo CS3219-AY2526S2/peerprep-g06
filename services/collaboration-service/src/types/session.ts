@@ -1,5 +1,5 @@
 // Internal collaboration-service domain models.
-import { JoinTokenClaims, Question, SessionReadyPayload } from './contracts';
+import { JoinTokenClaims, Question, SessionReadyPayload } from '../../../../shared/types';
 
 export type ParticipantStatus = 'connected' | 'disconnected' | 'left';
 export type CollaborationSessionStatus = 'pending' | 'active' | 'ended';

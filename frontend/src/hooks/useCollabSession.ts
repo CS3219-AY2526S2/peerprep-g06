@@ -9,24 +9,12 @@ import {
   SessionJoinedPayload,
   SessionSocket,
 } from '@/lib/collab';
+import { decodeYjsUpdateBase64, encodeYjsUpdateBase64 } from '@/lib/yjsEncoding';
 import { ConnectionStatus, useAppStore } from '@/store/useAppStore';
 
 const REMOTE_UPDATE_ORIGINS = new Set(['remote', 'remote-sync']);
 
 type TerminalReconnectStatus = Extract<ConnectionStatus, 'reconnect-failed' | 'grace-expired'>;
-
-function encodeUpdateBase64(update: Uint8Array): string {
-  let binary = '';
-  update.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return window.btoa(binary);
-}
-
-function decodeUpdateBase64(encodedUpdate: string): Uint8Array {
-  const binary = window.atob(encodedUpdate);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
 
 function classifySessionError(
   message: string,
@@ -93,7 +81,6 @@ export function useCollabSession(session: SessionReadyPayload | null) {
   const sharedDocRef = useRef<Y.Doc | null>(null);
   const docObserverRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
   const recoverySyncTimeoutRef = useRef<number | null>(null);
-  const sessionIdRef = useRef<string | null>(null);
   const isLeavingRef = useRef(false);
   const hasEverBeenLiveRef = useRef(false);
   const isRecoveryAttemptRef = useRef(false);
@@ -157,7 +144,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
       }
 
       socketRef.current.emit('doc:update', {
-        update: encodeUpdateBase64(update),
+        update: encodeYjsUpdateBase64(update),
       });
     };
 
@@ -174,7 +161,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
       disposeSharedDoc();
 
       const doc = createSharedDoc();
-      Y.applyUpdate(doc, decodeUpdateBase64(encodedUpdate), 'remote-sync');
+      Y.applyUpdate(doc, decodeYjsUpdateBase64(encodedUpdate), 'remote-sync');
     },
     [createSharedDoc, disposeSharedDoc],
   );
@@ -189,7 +176,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
     socketRef.current.disconnect();
   }, [clearRecoverySyncTimeout]);
 
-  const markTerminalReconnectState = useCallback(
+  const enterTerminalFailure = useCallback(
     (status: TerminalReconnectStatus, error: string) => {
       terminalStatusRef.current = status;
       awaitingSyncRef.current = false;
@@ -198,6 +185,53 @@ export function useCollabSession(session: SessionReadyPayload | null) {
       stopSocketReconnection();
     },
     [markStatus, stopSocketReconnection],
+  );
+
+  const enterRecovery = useCallback(() => {
+    clearRecoverySyncTimeout();
+    isRecoveryAttemptRef.current = true;
+    awaitingSyncRef.current = false;
+    markStatus('reconnecting');
+  }, [clearRecoverySyncTimeout, markStatus]);
+
+  const enterLive = useCallback(
+    (markLive = true) => {
+      clearRecoverySyncTimeout();
+      hasEverBeenLiveRef.current = true;
+      awaitingSyncRef.current = false;
+      isRecoveryAttemptRef.current = false;
+      terminalStatusRef.current = null;
+      if (markLive) {
+        markStatus('live');
+      }
+    },
+    [clearRecoverySyncTimeout, markStatus],
+  );
+
+  const enterAwaitingSync = useCallback(
+    (scheduleRecoverySyncFallback: () => void) => {
+      if (terminalStatusRef.current) {
+        return;
+      }
+
+      isRecoveryAttemptRef.current = true;
+      awaitingSyncRef.current = true;
+      markStatus('rejoined-awaiting-sync');
+      scheduleRecoverySyncFallback();
+    },
+    [markStatus],
+  );
+
+  const enterEnded = useCallback(
+    (payload: SessionEndedPayload, message: string | null = null) => {
+      clearRecoverySyncTimeout();
+      awaitingSyncRef.current = false;
+      isRecoveryAttemptRef.current = false;
+      terminalStatusRef.current = null;
+      setSessionEnded(payload);
+      markStatus('ended', message);
+    },
+    [clearRecoverySyncTimeout, markStatus],
   );
 
   const disconnect = useCallback(() => {
@@ -282,9 +316,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
         }
 
         if (isRecoveryAttemptRef.current) {
-          awaitingSyncRef.current = true;
-          markStatus('rejoined-awaiting-sync');
-          scheduleRecoverySyncFallback();
+          enterAwaitingSync(scheduleRecoverySyncFallback);
           return;
         }
 
@@ -303,9 +335,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
         }
 
         if (isRecoveryAttemptRef.current) {
-          awaitingSyncRef.current = true;
-          markStatus('rejoined-awaiting-sync');
-          scheduleRecoverySyncFallback();
+          enterAwaitingSync(scheduleRecoverySyncFallback);
         }
       });
 
@@ -328,16 +358,20 @@ export function useCollabSession(session: SessionReadyPayload | null) {
         const outcome = classifySessionError(message, isRecoveryAttemptRef.current);
 
         if (outcome.status === 'grace-expired' || outcome.status === 'reconnect-failed') {
-          markTerminalReconnectState(outcome.status, outcome.message);
+          enterTerminalFailure(outcome.status, outcome.message);
           return;
         }
 
         if (outcome.status === 'ended') {
-          setSessionEnded({
-            sessionId: session.sessionId,
-            reason: 'all-participants-left',
-            endedAt: new Date().toISOString(),
-          });
+          enterEnded(
+            {
+              sessionId: session.sessionId,
+              reason: 'all-participants-left',
+              endedAt: new Date().toISOString(),
+            },
+            outcome.message,
+          );
+          return;
         }
 
         clearRecoverySyncTimeout();
@@ -352,12 +386,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
         }
 
         syncSharedDoc(payload.update);
-        clearRecoverySyncTimeout();
-        hasEverBeenLiveRef.current = true;
-        awaitingSyncRef.current = false;
-        isRecoveryAttemptRef.current = false;
-        terminalStatusRef.current = null;
-        markStatus('live');
+        enterLive();
       });
 
       socket.on('doc:update', (payload) => {
@@ -367,11 +396,11 @@ export function useCollabSession(session: SessionReadyPayload | null) {
 
         if (!sharedDocRef.current) {
           const doc = createSharedDoc();
-          Y.applyUpdate(doc, decodeUpdateBase64(payload.update), 'remote');
+          Y.applyUpdate(doc, decodeYjsUpdateBase64(payload.update), 'remote');
           return;
         }
 
-        Y.applyUpdate(sharedDocRef.current, decodeUpdateBase64(payload.update), 'remote');
+        Y.applyUpdate(sharedDocRef.current, decodeYjsUpdateBase64(payload.update), 'remote');
       });
 
       socket.on('participant:status', (payload) => {
@@ -390,8 +419,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
           return;
         }
 
-        setSessionEnded(payload);
-        markStatus('ended');
+        enterEnded(payload);
       });
 
       socket.on('connect_error', (error) => {
@@ -407,34 +435,36 @@ export function useCollabSession(session: SessionReadyPayload | null) {
 
         if (isRecoveryAttempt) {
           if (outcome.status === 'grace-expired' || outcome.status === 'reconnect-failed') {
-            markTerminalReconnectState(outcome.status, outcome.message);
+            enterTerminalFailure(outcome.status, outcome.message);
             return;
           }
 
           if (outcome.status === 'ended') {
-            clearRecoverySyncTimeout();
-            setSessionEnded({
-              sessionId: session.sessionId,
-              reason: 'all-participants-left',
-              endedAt: new Date().toISOString(),
-            });
-            awaitingSyncRef.current = false;
-            isRecoveryAttemptRef.current = false;
-            markStatus('ended', outcome.message);
+            enterEnded(
+              {
+                sessionId: session.sessionId,
+                reason: 'all-participants-left',
+                endedAt: new Date().toISOString(),
+              },
+              outcome.message,
+            );
             return;
           }
 
-          awaitingSyncRef.current = false;
-          markStatus('reconnecting');
+          enterRecovery();
           return;
         }
 
         if (outcome.status === 'ended') {
-          setSessionEnded({
-            sessionId: session.sessionId,
-            reason: 'all-participants-left',
-            endedAt: new Date().toISOString(),
-          });
+          enterEnded(
+            {
+              sessionId: session.sessionId,
+              reason: 'all-participants-left',
+              endedAt: new Date().toISOString(),
+            },
+            outcome.message,
+          );
+          return;
         }
 
         clearRecoverySyncTimeout();
@@ -458,9 +488,11 @@ export function useCollabSession(session: SessionReadyPayload | null) {
         }
 
         clearRecoverySyncTimeout();
-        isRecoveryAttemptRef.current = hasEverBeenLiveRef.current;
-        awaitingSyncRef.current = false;
-        markStatus('reconnecting');
+        if (hasEverBeenLiveRef.current) {
+          enterRecovery();
+        } else {
+          markStatus('reconnecting');
+        }
 
         if (reason === 'io server disconnect') {
           queueMicrotask(() => {
@@ -482,9 +514,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
           return;
         }
 
-        isRecoveryAttemptRef.current = true;
-        awaitingSyncRef.current = false;
-        markStatus('reconnecting');
+        enterRecovery();
       });
 
       socket.io.on('reconnect', () => {
@@ -496,10 +526,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
           return;
         }
 
-        isRecoveryAttemptRef.current = true;
-        awaitingSyncRef.current = true;
-        markStatus('rejoined-awaiting-sync');
-        scheduleRecoverySyncFallback();
+        enterAwaitingSync(scheduleRecoverySyncFallback);
       });
 
       socket.io.on('reconnect_error', () => {
@@ -511,9 +538,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
           return;
         }
 
-        isRecoveryAttemptRef.current = true;
-        awaitingSyncRef.current = false;
-        markStatus('reconnecting');
+        enterRecovery();
       });
 
       socket.io.on('reconnect_failed', () => {
@@ -521,39 +546,31 @@ export function useCollabSession(session: SessionReadyPayload | null) {
           return;
         }
 
-        markTerminalReconnectState(
+        enterTerminalFailure(
           'reconnect-failed',
           'Unable to reconnect to your session. Please leave and try again.',
         );
       });
     } catch (error) {
-      markStatus(
-        'error',
-        error instanceof Error ? error.message : 'Failed to prepare session connection',
-      );
+        markStatus(
+          'error',
+          error instanceof Error ? error.message : 'Failed to prepare session connection',
+        );
     }
   }, [
     clearRecoverySyncTimeout,
     createSharedDoc,
     disconnect,
     markStatus,
-    markTerminalReconnectState,
+    enterAwaitingSync,
+    enterEnded,
+    enterLive,
+    enterRecovery,
+    enterTerminalFailure,
     reconnectAttempts,
     session,
     syncSharedDoc,
   ]);
-
-  useEffect(() => {
-    if (session?.sessionId === sessionIdRef.current) {
-      return;
-    }
-
-    sessionIdRef.current = session?.sessionId ?? null;
-    setJoinedSession(null);
-    setParticipantStatuses({});
-    setSessionEnded(null);
-    disposeSharedDoc();
-  }, [disposeSharedDoc, session?.sessionId]);
 
   useEffect(() => {
     if (!session) {
@@ -565,10 +582,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
         return;
       }
 
-      clearRecoverySyncTimeout();
-      isRecoveryAttemptRef.current = true;
-      awaitingSyncRef.current = false;
-      markStatus('reconnecting');
+      enterRecovery();
     };
 
     const handleOnline = () => {
@@ -577,18 +591,12 @@ export function useCollabSession(session: SessionReadyPayload | null) {
       }
 
       if (socketRef.current?.connected && hasEverBeenLiveRef.current) {
-        clearRecoverySyncTimeout();
-        awaitingSyncRef.current = false;
-        isRecoveryAttemptRef.current = false;
-        terminalStatusRef.current = null;
-        markStatus('live');
+        enterLive();
         return;
       }
 
       if (socketRef.current && !socketRef.current.connected) {
-        isRecoveryAttemptRef.current = true;
-        awaitingSyncRef.current = false;
-        markStatus('reconnecting');
+        enterRecovery();
         socketRef.current.connect();
       }
     };
@@ -600,7 +608,7 @@ export function useCollabSession(session: SessionReadyPayload | null) {
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('online', handleOnline);
     };
-  }, [clearRecoverySyncTimeout, markStatus, session]);
+  }, [enterLive, enterRecovery, session]);
 
   useEffect(() => {
     if (!session) {

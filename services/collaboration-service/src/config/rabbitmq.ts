@@ -2,16 +2,21 @@
 // The service opens one connection/channel pair, re-registers consumers after reconnect,
 // and keeps the rest of the service from silently losing its RabbitMQ subscriptions.
 import amqp from 'amqplib';
+import type { Channel, ChannelModel } from 'amqplib';
 import { config } from './env';
 import { logger } from '../utils/logger';
 
-let connection: any = null;
-let channel: any = null;
-let reconnectTimeout: NodeJS.Timeout | null = null;
-let connectInFlight: Promise<{ connection: any; channel: any }> | null = null;
-const consumerRegistrations = new Set<(channel: any) => Promise<void>>();
+const INITIAL_RECONNECT_DELAY_MS = 1_000;
+const MAX_RECONNECT_DELAY_MS = 30_000;
 
-function clearCachedHandles(closedConnection?: any, closedChannel?: any): void {
+let connection: ChannelModel | null = null;
+let channel: Channel | null = null;
+let reconnectTimeout: NodeJS.Timeout | null = null;
+let reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
+let connectInFlight: Promise<{ connection: ChannelModel; channel: Channel }> | null = null;
+let consumerSetup: ((channel: Channel) => Promise<void>) | null = null;
+
+function clearCachedHandles(closedConnection?: ChannelModel | null, closedChannel?: Channel | null): void {
   if (!closedConnection || connection === closedConnection) {
     connection = null;
   }
@@ -26,22 +31,26 @@ function scheduleReconnect(): void {
     return;
   }
 
+  const delayMs = reconnectDelayMs;
+  reconnectDelayMs = Math.min(reconnectDelayMs * 2, MAX_RECONNECT_DELAY_MS);
+
   reconnectTimeout = setTimeout(() => {
     reconnectTimeout = null;
     void connectRabbitMq().catch((error) => {
       logger.error('RabbitMQ reconnect failed', error);
       scheduleReconnect();
     });
-  }, 1000);
+  }, delayMs);
 }
 
-async function registerConsumers(activeChannel: any): Promise<void> {
-  for (const registerConsumer of consumerRegistrations) {
-    await registerConsumer(activeChannel);
+async function setupConsumer(activeChannel: Channel): Promise<void> {
+  if (!consumerSetup) {
+    return;
   }
+  await consumerSetup(activeChannel);
 }
 
-function attachLifecycleHandlers(activeConnection: any, activeChannel: any): void {
+function attachLifecycleHandlers(activeConnection: ChannelModel, activeChannel: Channel): void {
   activeConnection.on('error', (error: unknown) => {
     logger.error('RabbitMQ connection error', error);
   });
@@ -61,18 +70,17 @@ function attachLifecycleHandlers(activeConnection: any, activeChannel: any): voi
   });
 }
 
-export async function registerRabbitMqConsumer(
-  registerConsumer: (channel: any) => Promise<void>,
-): Promise<void> {
-  consumerRegistrations.add(registerConsumer);
-
-  if (channel) {
-    await registerConsumer(channel);
+export async function connectRabbitMq(
+  registerConsumer?: (channel: Channel) => Promise<void>,
+): Promise<{ connection: ChannelModel; channel: Channel }> {
+  if (registerConsumer) {
+    consumerSetup = registerConsumer;
   }
-}
 
-export async function connectRabbitMq(): Promise<{ connection: any; channel: any }> {
   if (connection && channel) {
+    if (registerConsumer) {
+      await setupConsumer(channel);
+    }
     return { connection, channel };
   }
 
@@ -88,9 +96,10 @@ export async function connectRabbitMq(): Promise<{ connection: any; channel: any
 
     connection = activeConnection;
     channel = activeChannel;
+    reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
 
     logger.info('RabbitMQ connection established');
-    await registerConsumers(activeChannel);
+    await setupConsumer(activeChannel);
 
     return { connection: activeConnection, channel: activeChannel };
   })();

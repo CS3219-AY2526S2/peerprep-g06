@@ -2,7 +2,7 @@
 // This module turns a MatchFound event into the initial session seed that gets persisted in Redis.
 import { randomBytes, randomUUID } from 'crypto';
 import { config } from '../config/env';
-import { JoinTokenClaims, MatchFoundEvent } from '../types/contracts';
+import { JoinTokenClaims, MatchFoundEvent } from '../../../../shared/types';
 import { CollaborationSession, PersistedSessionSeed, SessionParticipant } from '../types/session';
 import {
   claimMatchSessionLock,
