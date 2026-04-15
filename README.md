@@ -1,6 +1,6 @@
-# PeerPrep
+# Neeg06Code (PeerPrep)
 
-PeerPrep is a microservice-based interview practice platform where users:
+[Neeg06Code](https://neeg06code.com/) is a microservice-based interview practice platform where users:
 
 1. Sign in with Supabase auth
 2. Choose **difficulty + topic + language**
@@ -68,18 +68,9 @@ The repository is a monorepo containing a Vite frontend, four backend services, 
 
 ## Architecture and Runtime Flow
 
-### High-Level Topology
+### High-Level Design
 
-```text
-Browser (frontend)
-   |
-   v
-Nginx Gateway (:8080 default)
-   |-- /users* -----------------> user-service (:3001) ------> Supabase
-   |-- /questions* -------------> question-service (:3002) --> Supabase
-   |-- /matching/socket.io* ----> matching-service (:3003) --> Redis, RabbitMQ, question-service
-   |-- /collaboration/socket.io* -> collaboration-service (:3004) --> Redis, RabbitMQ, Supabase
-```
+![High-level Design](/assets/high-level-design.png)
 
 ### Match-to-Session Sequence
 
