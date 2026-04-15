@@ -65,9 +65,7 @@ function encodeGraceIndexMember(sessionId: string, userId: string): string {
   return JSON.stringify({ sessionId, userId });
 }
 
-function decodeGraceIndexMember(
-  member: string,
-): { sessionId: string; userId: string } | null {
+function decodeGraceIndexMember(member: string): { sessionId: string; userId: string } | null {
   try {
     const parsed = JSON.parse(member) as { sessionId?: unknown; userId?: unknown };
     if (typeof parsed.sessionId === 'string' && typeof parsed.userId === 'string') {
@@ -280,13 +278,9 @@ export async function listPendingDeliveries(userId: string): Promise<PendingDeli
 
 export async function saveGracePeriod(record: GracePeriodRecord): Promise<void> {
   const transaction = redis.multi();
-  transaction.set(
-    collabKeys.graceTimer(record.sessionId, record.userId),
-    JSON.stringify(record),
-    {
-      EX: graceTtlSeconds(record),
-    },
-  );
+  transaction.set(collabKeys.graceTimer(record.sessionId, record.userId), JSON.stringify(record), {
+    EX: graceTtlSeconds(record),
+  });
   transaction.zAdd(collabKeys.graceIndex(), {
     score: new Date(record.expiresAt).getTime(),
     value: encodeGraceIndexMember(record.sessionId, record.userId),
@@ -361,7 +355,10 @@ export async function deleteSessionState(sessionId: string): Promise<void> {
   for (const participant of participants ?? []) {
     transaction.del(collabKeys.joinToken(sessionId, participant.userId));
     transaction.del(collabKeys.graceTimer(sessionId, participant.userId));
-    transaction.zRem(collabKeys.graceIndex(), encodeGraceIndexMember(sessionId, participant.userId));
+    transaction.zRem(
+      collabKeys.graceIndex(),
+      encodeGraceIndexMember(sessionId, participant.userId),
+    );
     transaction.del(collabKeys.pendingDelivery(participant.userId, sessionId));
     transaction.sRem(collabKeys.pendingDeliveryIndex(participant.userId), sessionId);
   }

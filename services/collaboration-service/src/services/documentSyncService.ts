@@ -56,7 +56,10 @@ export function getPlainTextFromDocumentSnapshot(snapshot: SessionDocumentSnapsh
     Y.applyUpdate(doc, decodeUpdateBase64(snapshot.content));
     return doc.getText(DOCUMENT_TEXT_KEY).toString();
   } catch (error) {
-    logger.error(`Failed to decode persisted document snapshot for session ${snapshot.sessionId}`, error);
+    logger.error(
+      `Failed to decode persisted document snapshot for session ${snapshot.sessionId}`,
+      error,
+    );
     return '';
   } finally {
     doc.destroy();

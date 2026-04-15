@@ -16,7 +16,10 @@ let reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
 let connectInFlight: Promise<{ connection: ChannelModel; channel: Channel }> | null = null;
 let consumerSetup: ((channel: Channel) => Promise<void>) | null = null;
 
-function clearCachedHandles(closedConnection?: ChannelModel | null, closedChannel?: Channel | null): void {
+function clearCachedHandles(
+  closedConnection?: ChannelModel | null,
+  closedChannel?: Channel | null,
+): void {
   if (!closedConnection || connection === closedConnection) {
     connection = null;
   }

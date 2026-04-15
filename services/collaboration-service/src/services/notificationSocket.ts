@@ -5,10 +5,7 @@ import {
   NotificationServer,
   registerAuthenticatedNotificationSocket,
 } from './notificationService';
-import {
-  AuthenticatedNotificationSocket,
-  getBearerToken,
-} from './socketAuth';
+import { AuthenticatedNotificationSocket, getBearerToken } from './socketAuth';
 import { logger } from '../utils/logger';
 
 export function configureNotificationNamespace(io: NotificationServer): void {

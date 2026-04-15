@@ -25,10 +25,10 @@ interface ShouldHandleUnexpectedDisconnectParams {
   socketId: string;
 }
 
-export function isSessionComplete(
-  participants: SessionParticipant[] | null | undefined,
-): boolean {
-  return Boolean(participants && participants.every((participant) => participant.status === 'left'));
+export function isSessionComplete(participants: SessionParticipant[] | null | undefined): boolean {
+  return Boolean(
+    participants && participants.every((participant) => participant.status === 'left'),
+  );
 }
 
 export function shouldHandleUnexpectedDisconnect({
