@@ -1,14 +1,15 @@
 FROM node:24-alpine AS base
 
-WORKDIR /app
+WORKDIR /repo/services/collaboration-service
 
-COPY package*.json ./
+COPY services/collaboration-service/package*.json ./
 
 FROM base AS dev
 
 RUN npm ci
 
-COPY . .
+COPY services/collaboration-service/ ./
+COPY shared/types.ts /repo/shared/types.ts
 
 ENV NODE_ENV=development
 
@@ -18,7 +19,8 @@ FROM base AS build
 
 RUN npm ci
 
-COPY . .
+COPY services/collaboration-service/ ./
+COPY shared/types.ts /repo/shared/types.ts
 
 RUN npm run build
 
@@ -28,11 +30,11 @@ RUN npm ci --omit=dev
 
 FROM node:24-alpine AS prod
 
-WORKDIR /app
+WORKDIR /repo/services/collaboration-service
 
-COPY package*.json ./
-COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
+COPY services/collaboration-service/package*.json ./
+COPY --from=prod-deps /repo/services/collaboration-service/node_modules ./node_modules
+COPY --from=build /repo/services/collaboration-service/dist ./dist
 
 ENV NODE_ENV=production
 
