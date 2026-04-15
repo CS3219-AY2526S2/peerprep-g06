@@ -339,7 +339,7 @@ PeerPrep runs locally as:
 
 Use these files for local development:
 
-- root [`.env.example`](./.env.example)
+- root [`.env.local.example`](./.env.local.example)
   This drives Docker Compose for the gateway, backend services, and RabbitMQ.
 - frontend [`frontend/.env.local.example`](./frontend/.env.local.example)
   This drives the frontend development build.
@@ -418,12 +418,15 @@ CI runs:
 
 ### CD (`.github/workflows/cd.yml`)
 
-CD runs on successful CI on `main` (or manual dispatch) and does:
+CD runs on successful CI on `main` (or manual dispatch) and currently handles the frontend only.
 
-1. Build and push backend images (`user-service`, `question-service`, `matching-service`, `collaboration-service`, `nginx`) to ECR
-2. Deploy ECS services using updated task definitions
-3. Build frontend and deploy assets to S3
-4. Invalidate CloudFront cache
+It does:
+
+1. Build the frontend with production `VITE_*` values
+2. Upload the built `frontend/dist` artifact
+3. Deploy the frontend to Firebase Hosting
+
+Backend deployment is manual and is performed from a developer machine using [`scripts/deploy-backend.sh`](./scripts/deploy-backend.sh).
 
 For infrastructure details, refer to this README’s CI/CD and Production Deployment sections and the workflow files in `.github/workflows/`.
 
@@ -431,7 +434,7 @@ For infrastructure details, refer to this README’s CI/CD and Production Deploy
 
 PeerPrep is currently deployed in the following shape:
 
-- frontend: static hosting (S3 + CloudFront)
+- frontend: Firebase Hosting on `https://neeg06code.com`
 - backend: AWS ECS Fargate services behind Nginx
 - backend public entrypoint: `https://api.neeg06code.com`
 - backend ingress: ALB -> Nginx -> internal services
@@ -500,12 +503,19 @@ Do not store production secrets in the repository.
 
 ### Backend Deployment
 
-1. Build and push backend images to ECR.
-2. Update ECS task definitions with the new image tags and production env values.
-3. Deploy ECS services.
-4. Ensure the ALB forwards traffic to the Nginx service.
-5. Ensure the ALB health check points at `/gateway/health`.
-6. Ensure Nginx listens internally on port `80`.
+The backend is currently deployed manually from a developer machine using:
+
+```bash
+./scripts/deploy-backend.sh
+```
+
+The script:
+
+1. prompts for temporary AWS credentials, including the session token when required
+2. builds production images for the backend services
+3. pushes those images to ECR
+4. registers new ECS task definition revisions
+5. updates ECS services and waits for stability
 
 Recommended backend rollout order:
 
@@ -515,15 +525,30 @@ Recommended backend rollout order:
 4. `collaboration-service`
 5. `nginx`
 
+Backend infrastructure requirements:
+
+1. Ensure the ALB forwards traffic to the Nginx service.
+2. Ensure the ALB health check points at `/gateway/health`.
+3. Ensure Nginx listens internally on port `80`.
+
 ### Frontend Deployment
 
-Build the production frontend:
+The frontend is deployed automatically through GitHub Actions CD to Firebase Hosting.
+
+The workflow:
+
+1. builds the frontend with production `VITE_*` values
+2. uploads the build artifact
+3. deploys the artifact to Firebase Hosting
+
+Manual frontend deployment is still available when needed:
 
 ```bash
 npm run build --prefix frontend
+firebase deploy --only hosting
 ```
 
-Deploy `frontend/dist` to your static hosting target (CD workflow uses S3 sync + CloudFront invalidation).
+The Firebase Hosting configuration lives in [`firebase.json`](./firebase.json).
 
 ### Production Validation
 
