@@ -20,6 +20,7 @@ vi.mock('../src/services/questionService', () => ({
 import { TestServer, startTestServer, flushRedis } from './helpers/server';
 import { createConnectedClient, waitForEvent, disconnectAll } from './helpers/client';
 import { publishEvent } from '../src/config/rabbitmq';
+import { getRandomQuestion } from '../src/services/questionService';
 import { redis } from '../src/config/redis';
 import { Socket } from 'socket.io-client';
 
@@ -247,5 +248,48 @@ describe('Group B: Edge Cases', () => {
 
     const error = await errorPromise;
     expect(error.message).toContain('Missing required fields');
+  });
+
+  it('should keep users in queue when question service fails', async () => {
+    // Make getRandomQuestion throw to simulate no questions for this filter
+    vi.mocked(getRandomQuestion).mockRejectedValueOnce(
+      new Error('Failed to get random question: 404'),
+    );
+
+    const client1 = await createConnectedClient(server.port);
+    const client2 = await createConnectedClient(server.port);
+
+    let matched = false;
+    client1.on('match_found', () => {
+      matched = true;
+    });
+    client2.on('match_found', () => {
+      matched = true;
+    });
+
+    client1.emit('join_queue', {
+      userId: 'user-qfail-1',
+      difficulty: 'easy',
+      topics: ['arrays'],
+      language: 'javascript',
+    });
+
+    client2.emit('join_queue', {
+      userId: 'user-qfail-2',
+      difficulty: 'easy',
+      topics: ['arrays'],
+      language: 'javascript',
+    });
+
+    // Wait for the eager match attempt to process
+    await new Promise((r) => setTimeout(r, 1000));
+
+    // No match should have been created
+    expect(matched).toBe(false);
+
+    // Both users should still be in the queue
+    const members = await redis.zRange('queue:easy:javascript', 0, -1);
+    expect(members).toContain('user-qfail-1');
+    expect(members).toContain('user-qfail-2');
   });
 });
