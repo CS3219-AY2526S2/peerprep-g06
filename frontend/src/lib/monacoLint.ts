@@ -177,10 +177,7 @@ function buildBracketMarkers(
   return markers;
 }
 
-function buildLineMarkers(
-  source: string,
-  monaco: typeof Monaco,
-): Monaco.editor.IMarkerData[] {
+function buildLineMarkers(source: string, monaco: typeof Monaco): Monaco.editor.IMarkerData[] {
   const markers: Monaco.editor.IMarkerData[] = [];
   const lines = source.split('\n');
 
