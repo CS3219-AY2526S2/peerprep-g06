@@ -79,8 +79,17 @@ const Queue = () => {
   };
 
   const handleRetry = () => {
-    resetMatching();
-    navigate('/match');
+    if (!user || !selectedDifficulty || !selectedTopic || !selectedLanguage) {
+      navigate('/match');
+      return;
+    }
+    setPhase('queue');
+    joinQueue({
+      userId: user.id,
+      difficulty: selectedDifficulty,
+      topics: [selectedTopic],
+      language: selectedLanguage,
+    });
   };
 
   const handleChangePreferences = () => {
@@ -138,10 +147,10 @@ const Queue = () => {
               Try changing your preferences or retry with the same settings.
             </p>
             <div className="flex gap-3 justify-center">
-              <Button variant="hero" onClick={handleChangePreferences}>
-                Change Preferences
+              <Button variant="ghost" onClick={handleChangePreferences}>
+                Cancel
               </Button>
-              <Button variant="ghost" onClick={handleRetry}>
+              <Button variant="hero" onClick={handleRetry}>
                 Retry
               </Button>
             </div>
