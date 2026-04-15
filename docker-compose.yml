@@ -85,7 +85,8 @@ services:
 
   collaboration-service:
     build:
-      context: ./services/collaboration-service
+      context: .
+      dockerfile: services/collaboration-service/Dockerfile
       target: dev
     container_name: peerprep-collaboration-service
     ports:
@@ -109,8 +110,9 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - NODE_ENV=development
     volumes:
-      - ./services/collaboration-service:/app
-      - /app/node_modules
+      - ./services/collaboration-service:/repo/services/collaboration-service
+      - ./shared:/repo/shared
+      - /repo/services/collaboration-service/node_modules
     depends_on:
       rabbitmq:
         condition: service_healthy
