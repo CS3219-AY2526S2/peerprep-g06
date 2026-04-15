@@ -16,7 +16,7 @@ const Queue = () => {
   const { user } = useAuth();
   const {
     selectedDifficulty,
-    selectedTopic,
+    selectedTopics,
     selectedLanguage,
     pendingSession,
     setCurrentState,
@@ -32,7 +32,7 @@ const Queue = () => {
 
   // Join queue on mount
   useEffect(() => {
-    if (!user || !selectedDifficulty || !selectedTopic || !selectedLanguage) {
+    if (!user || !selectedDifficulty || selectedTopics.length === 0 || !selectedLanguage) {
       navigate('/match');
       return;
     }
@@ -41,7 +41,7 @@ const Queue = () => {
     joinQueue({
       userId: user.id,
       difficulty: selectedDifficulty,
-      topics: [selectedTopic],
+      topics: selectedTopics,
       language: selectedLanguage,
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -104,7 +104,7 @@ const Queue = () => {
             <QueueRing state={ringState} timeLeft={timeLeft} />
             <h2 className="text-xl font-semibold mt-6 mb-2">Searching for a match...</h2>
             <p className="text-muted-foreground mb-8">
-              {selectedDifficulty} / {selectedTopic} / {selectedLanguage}
+              {selectedDifficulty} / {selectedTopics.join(', ')} / {selectedLanguage}
             </p>
             <Button variant="ghost" onClick={handleCancel}>
               Cancel
