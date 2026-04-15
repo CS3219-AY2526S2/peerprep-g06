@@ -61,7 +61,7 @@ get_context() {
     user-service) echo "services/user-service" ;;
     question-service) echo "services/question-service" ;;
     matching-service) echo "." ;;
-    collaboration-service) echo "services/collaboration-service" ;;
+    collaboration-service) echo "." ;;
     nginx) echo "nginx" ;;
     *) return 1 ;;
   esac
