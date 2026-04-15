@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { RealtimeChannel, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -20,6 +20,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const { setUser: setStoreUser, logout: storeLogout } = useAppStore();
+  const profileChannelRef = useRef<RealtimeChannel | null>(null);
 
   // Helper to sync any Supabase user → app store
   const syncToStore = async (supabaseUser: User | null) => {
@@ -65,6 +66,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => subscription?.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (profileChannelRef.current) {
+      supabase.removeChannel(profileChannelRef.current);
+      profileChannelRef.current = null;
+    }
+
+    if (!user) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`profile-updates-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          const currentUser = useAppStore.getState().user;
+          if (!currentUser || currentUser.id !== user.id) {
+            return;
+          }
+
+          const updatedProfile = payload.new as {
+            role?: 'user' | 'admin' | 'developer';
+            is_requesting_admin?: boolean;
+            is_requesting_demote?: boolean;
+          };
+
+          setStoreUser({
+            ...currentUser,
+            role: updatedProfile.role ?? currentUser.role,
+            isRequestingAdmin: updatedProfile.is_requesting_admin ?? currentUser.isRequestingAdmin,
+            isRequestingDemote:
+              updatedProfile.is_requesting_demote ?? currentUser.isRequestingDemote,
+          });
+        },
+      )
+      .subscribe();
+
+    profileChannelRef.current = channel;
+
+    return () => {
+      if (profileChannelRef.current) {
+        supabase.removeChannel(profileChannelRef.current);
+        profileChannelRef.current = null;
+      }
+    };
+  }, [user, setStoreUser]);
 
   const signUp = async (email: string, password: string, name: string) => {
     const { data, error } = await supabase.auth.signUp({
