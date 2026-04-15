@@ -339,7 +339,7 @@ PeerPrep runs locally as:
 
 Use these files for local development:
 
-- root [`.env.example`](./.env.example)
+- root [`.env.local.example`](./.env.local.example)
   This drives Docker Compose for the gateway, backend services, and RabbitMQ.
 - frontend [`frontend/.env.local.example`](./frontend/.env.local.example)
   This drives the frontend development build.
@@ -347,6 +347,13 @@ Use these files for local development:
   These are useful when running an individual service directly outside Docker Compose.
 
 Create the real env files you need before startup. Do not commit real secrets.
+
+Suggested setup:
+
+```bash
+cp .env.local.example .env
+cp frontend/.env.local.example frontend/.env.local
+```
 
 ### Local Startup
 
@@ -416,14 +423,36 @@ CI runs:
 2. Matrix package validation (install, typecheck, tests/coverage where configured, build)
 3. Docker image build validation for backend services
 
+Current Docker image validation covers:
+
+- `user-service`
+- `question-service`
+- `matching-service`
+- `collaboration-service`
+
+It does not currently build `nginx` in CI.
+
 ### CD (`.github/workflows/cd.yml`)
 
-CD runs on successful CI on `main` (or manual dispatch) and does:
+CD runs on successful CI on `main` (or manual dispatch) and currently handles the frontend only.
 
-1. Build and push backend images (`user-service`, `question-service`, `matching-service`, `collaboration-service`, `nginx`) to ECR
-2. Deploy ECS services using updated task definitions
-3. Build frontend and deploy assets to S3
-4. Invalidate CloudFront cache
+It does:
+
+1. Build the frontend with production `VITE_*` values
+2. Upload the built `frontend/dist` artifact
+3. Deploy the frontend to Firebase Hosting
+
+Current GitHub Actions secrets required for frontend CD:
+
+- `GCP_SA_KEY`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Current Firebase deploy target:
+
+- Firebase project ID: `neeg06code-prod`
+
+Backend deployment is manual and is performed from a developer machine using [`scripts/deploy-backend.sh`](./scripts/deploy-backend.sh).
 
 For infrastructure details, refer to this README’s CI/CD and Production Deployment sections and the workflow files in `.github/workflows/`.
 
@@ -431,7 +460,7 @@ For infrastructure details, refer to this README’s CI/CD and Production Deploy
 
 PeerPrep is currently deployed in the following shape:
 
-- frontend: static hosting (S3 + CloudFront)
+- frontend: Firebase Hosting on `https://neeg06code.com`
 - backend: AWS ECS Fargate services behind Nginx
 - backend public entrypoint: `https://api.neeg06code.com`
 - backend ingress: ALB -> Nginx -> internal services
@@ -500,12 +529,35 @@ Do not store production secrets in the repository.
 
 ### Backend Deployment
 
-1. Build and push backend images to ECR.
-2. Update ECS task definitions with the new image tags and production env values.
-3. Deploy ECS services.
-4. Ensure the ALB forwards traffic to the Nginx service.
-5. Ensure the ALB health check points at `/gateway/health`.
-6. Ensure Nginx listens internally on port `80`.
+The backend is currently deployed manually from a developer machine using:
+
+```bash
+./scripts/deploy-backend.sh
+```
+
+The script:
+
+1. prompts for temporary AWS credentials, including the session token when required
+2. builds production images for the backend services
+3. pushes those images to ECR
+4. registers new ECS task definition revisions
+5. updates ECS services and waits for stability
+
+The script currently assumes these fixed infrastructure values:
+
+- AWS region: `ap-southeast-1`
+- AWS account ID: `894064921761`
+- ECS cluster: `neeg06code-prod`
+- ECS task definition family prefix: `neeg06code`
+- ECR repository prefix: `neeg06code`
+- Docker target platform: `linux/amd64`
+
+It prompts only for:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_SESSION_TOKEN`
+- `IMAGE_TAG`
 
 Recommended backend rollout order:
 
@@ -515,29 +567,47 @@ Recommended backend rollout order:
 4. `collaboration-service`
 5. `nginx`
 
+Backend infrastructure requirements:
+
+1. Ensure the ALB forwards traffic to the Nginx service.
+2. Ensure the ALB health check points at `/gateway/health`.
+3. Ensure Nginx listens internally on port `80`.
+
 ### Frontend Deployment
 
-Build the production frontend:
+The frontend is deployed automatically through GitHub Actions CD to Firebase Hosting.
+
+The workflow:
+
+1. builds the frontend with production `VITE_*` values
+2. uploads the build artifact
+3. deploys the artifact to Firebase Hosting
+
+Manual frontend deployment is still available when needed:
 
 ```bash
 npm run build --prefix frontend
+firebase deploy --only hosting
 ```
 
-Deploy `frontend/dist` to your static hosting target (CD workflow uses S3 sync + CloudFront invalidation).
+The Firebase Hosting configuration lives in [`firebase.json`](./firebase.json).
 
 ### Production Validation
 
-After deployment, validate these in order:
+Validate backend deployment first:
 
 1. `https://api.neeg06code.com/gateway/health`
 2. `https://api.neeg06code.com/users/health`
 3. `https://api.neeg06code.com/questions/health`
 4. `https://api.neeg06code.com/matching/health`
 5. `https://api.neeg06code.com/collaboration/health`
-6. `https://neeg06code.com`
-7. authenticated frontend flow
-8. matchmaking websocket flow
-9. collaboration websocket flow
+
+Then validate the frontend deployment:
+
+1. `https://neeg06code.com`
+2. authenticated frontend flow
+3. matchmaking websocket flow
+4. collaboration websocket flow
 
 ## Troubleshooting
 

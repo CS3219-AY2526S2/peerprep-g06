@@ -8,67 +8,17 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
 
 concurrency:
-  group: cd-production
+  group: cd-frontend-production
   cancel-in-progress: false
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-  ECS_CLUSTER: peerprep
+  DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+  FIREBASE_PROJECT_ID: neeg06code-prod
 
 jobs:
-  build-backend:
-    name: Build ${{ matrix.service }}
-    runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: user-service
-            context: services/user-service
-            dockerfile: services/user-service/Dockerfile
-          - service: question-service
-            context: services/question-service
-            dockerfile: services/question-service/Dockerfile
-          - service: matching-service
-            context: .
-            dockerfile: services/matching-service/Dockerfile
-          - service: collaboration-service
-            context: services/collaboration-service
-            dockerfile: services/collaboration-service/Dockerfile
-          - service: nginx
-            context: nginx
-            dockerfile: nginx/Dockerfile
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
-          push: true
-          tags: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/peerprep/${{ matrix.service }}:${{ github.sha }}
-
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
@@ -79,6 +29,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -97,10 +49,9 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_USER_SERVICE_URL: ${{ secrets.VITE_USER_SERVICE_URL }}
-          VITE_QUESTION_SERVICE_URL: ${{ secrets.VITE_QUESTION_SERVICE_URL }}
-          VITE_MATCHING_WS_URL: ${{ secrets.VITE_MATCHING_WS_URL }}
-          VITE_COLLAB_WS_URL: ${{ secrets.VITE_COLLAB_WS_URL }}
+          VITE_GATEWAY_URL: https://api.neeg06code.com
+          VITE_MATCHING_WS_PATH: /matching/socket.io
+          VITE_COLLAB_WS_PATH: /collaboration/socket.io
 
       - name: Upload frontend build artifact
         uses: actions/upload-artifact@v4
@@ -109,161 +60,38 @@ jobs:
           path: frontend/dist
           retention-days: 1
 
-  deploy-backend:
-    name: Deploy Backend
-    runs-on: ubuntu-latest
-    needs: build-backend
-
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      # ── nginx ──────────────────────────────────────────
-      - name: Fetch nginx task definition
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition peerprep-nginx \
-            --query taskDefinition \
-            > nginx-task-def.json
-
-      - name: Render nginx image
-        id: render-nginx
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: nginx-task-def.json
-          container-name: nginx
-          image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/peerprep/nginx:${{ github.sha }}
-
-      - name: Deploy nginx
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render-nginx.outputs.task-definition }}
-          service: peerprep-nginx
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
-
-      # ── user-service ───────────────────────────────────
-      - name: Fetch user-service task definition
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition peerprep-user-service \
-            --query taskDefinition \
-            > user-service-task-def.json
-
-      - name: Render user-service image
-        id: render-user-service
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: user-service-task-def.json
-          container-name: user-service
-          image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/peerprep/user-service:${{ github.sha }}
-
-      - name: Deploy user-service
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render-user-service.outputs.task-definition }}
-          service: peerprep-user-service
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
-
-      # ── question-service ───────────────────────────────
-      - name: Fetch question-service task definition
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition peerprep-question-service \
-            --query taskDefinition \
-            > question-service-task-def.json
-
-      - name: Render question-service image
-        id: render-question-service
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: question-service-task-def.json
-          container-name: question-service
-          image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/peerprep/question-service:${{ github.sha }}
-
-      - name: Deploy question-service
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render-question-service.outputs.task-definition }}
-          service: peerprep-question-service
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
-
-      # ── matching-service ───────────────────────────────
-      - name: Fetch matching-service task definition
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition peerprep-matching-service \
-            --query taskDefinition \
-            > matching-service-task-def.json
-
-      - name: Render matching-service image
-        id: render-matching-service
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: matching-service-task-def.json
-          container-name: matching-service
-          image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/peerprep/matching-service:${{ github.sha }}
-
-      - name: Deploy matching-service
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render-matching-service.outputs.task-definition }}
-          service: peerprep-matching-service
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
-
-      # ── collaboration-service ──────────────────────────
-      - name: Fetch collaboration-service task definition
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition peerprep-collaboration-service \
-            --query taskDefinition \
-            > collaboration-service-task-def.json
-
-      - name: Render collaboration-service image
-        id: render-collaboration-service
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: collaboration-service-task-def.json
-          container-name: collaboration-service
-          image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/peerprep/collaboration-service:${{ github.sha }}
-
-      - name: Deploy collaboration-service
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render-collaboration-service.outputs.task-definition }}
-          service: peerprep-collaboration-service
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
-
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
     needs: build-frontend
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
       - name: Download frontend build artifact
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: dist
+          path: frontend/dist
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Upload to S3
-        run: aws s3 sync dist/ s3://peerprep-frontend --delete
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
 
-      - name: Invalidate CloudFront cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Deploy to Firebase Hosting
+        run: firebase deploy --only hosting --project "${{ env.FIREBASE_PROJECT_ID }}" --non-interactive
