@@ -7,7 +7,7 @@ const HISTORY_TABLE_NAME = 'history';
 
 export interface HistoryEntry {
   user_id: string;
-  question_id: string;
+  question_id: number;
   session_id: string;
   partner_id: string;
   solution: string;
@@ -15,7 +15,7 @@ export interface HistoryEntry {
 
 interface SessionAttemptHistoryContext {
   session: CollaborationSession;
-  questionId: string;
+  questionId: number;
   solution: string;
 }
 
@@ -35,7 +35,7 @@ const defaultDependencies: AttemptHistoryDependencies = {
 
 export function buildAttemptHistoryEntries(
   session: CollaborationSession,
-  questionId: string,
+  questionId: number,
   solution: string,
 ): HistoryEntry[] {
   return [
@@ -101,9 +101,14 @@ export async function getSessionAttemptHistoryContext(
     return null;
   }
 
+  const questionId = Number(question.id);
+  if (!Number.isSafeInteger(questionId) || questionId < 1) {
+    throw new Error(`Invalid numeric question id for session history: ${question.id}`);
+  }
+
   return {
     session,
-    questionId: question.id,
+    questionId,
     solution: getPlainTextFromDocumentSnapshot(snapshot),
   };
 }
