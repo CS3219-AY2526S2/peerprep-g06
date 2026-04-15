@@ -70,7 +70,8 @@ Socket path is configured at gateway level as `/collaboration/socket.io`.
 
 #### Client -> Server
 
-- `notification:register`: `{ userId }` (optional compatibility no-op)
+- `notification:register`: `{ userId }`
+  - used by the frontend to explicitly trigger replay of any queued `session-ready` payloads after connect or recovery
 
 #### Server -> Client
 
@@ -138,6 +139,23 @@ npm run typecheck
 ```bash
 npm test
 ```
+
+Watch mode:
+
+```bash
+npm run test:watch
+```
+
+Coverage:
+
+```bash
+npm run test:coverage
+```
+
+The test suite is organized under [tests/](tests/) and uses Vitest throughout:
+
+- unit and module-mock tests for persistence, auth, history, notification helpers, and session lifecycle
+- focused in-process Socket.IO integration tests for notification handoff and session namespace behavior
 
 ### Build
 
