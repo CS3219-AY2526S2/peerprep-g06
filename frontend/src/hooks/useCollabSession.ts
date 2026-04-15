@@ -235,6 +235,8 @@ export function useCollabSession(session: SessionReadyPayload | null) {
   );
 
   const disconnect = useCallback(() => {
+    activeConnectionIdRef.current += 1;
+
     if (!socketRef.current) {
       return;
     }
@@ -266,6 +268,9 @@ export function useCollabSession(session: SessionReadyPayload | null) {
 
     try {
       const accessToken = await getCollabAccessToken();
+      if (activeConnectionIdRef.current !== connectionId) {
+        return;
+      }
 
       const socket = createSessionSocket(
         accessToken,
@@ -273,6 +278,10 @@ export function useCollabSession(session: SessionReadyPayload | null) {
         session.joinToken,
         reconnectAttempts,
       );
+      if (activeConnectionIdRef.current !== connectionId) {
+        socket.disconnect();
+        return;
+      }
       socketRef.current = socket;
 
       const isActiveSocket = () =>
@@ -552,10 +561,14 @@ export function useCollabSession(session: SessionReadyPayload | null) {
         );
       });
     } catch (error) {
-        markStatus(
-          'error',
-          error instanceof Error ? error.message : 'Failed to prepare session connection',
-        );
+      if (activeConnectionIdRef.current !== connectionId) {
+        return;
+      }
+
+      markStatus(
+        'error',
+        error instanceof Error ? error.message : 'Failed to prepare session connection',
+      );
     }
   }, [
     clearRecoverySyncTimeout,
