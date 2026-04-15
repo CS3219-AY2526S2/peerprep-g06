@@ -21,7 +21,6 @@ const Queue = () => {
     pendingSession,
     setCurrentState,
     clearPendingSession,
-    resetMatching,
   } = useAppStore();
 
   const { joinQueue, cancelQueue, status, matchData, error, timeLeft } = useMatchmaking();
