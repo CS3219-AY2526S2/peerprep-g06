@@ -164,7 +164,9 @@ export const MatchingSetup = () => {
               >
                 <div className="text-2xl mb-2">{topic.icon}</div>
                 <span className="text-sm font-medium">{topic.label}</span>
-                {localTopics.includes(topic.id) && <CheckCircle2 className="h-4 w-4 text-primary mt-2" />}
+                {localTopics.includes(topic.id) && (
+                  <CheckCircle2 className="h-4 w-4 text-primary mt-2" />
+                )}
               </button>
             ))}
           </div>
