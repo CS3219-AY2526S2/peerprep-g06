@@ -70,7 +70,7 @@ Socket path is configured at gateway level as `/collaboration/socket.io`.
 
 #### Client -> Server
 
-- `notification:register`: `{ userId }`
+- `notification:register`: `{ userId }` (optional compatibility no-op)
 
 #### Server -> Client
 
@@ -101,7 +101,29 @@ Socket path is configured at gateway level as `/collaboration/socket.io`.
 - **Redis**: session metadata, join tokens, pending notifications, grace periods, and document snapshots
 - **RabbitMQ**: consumes `match.found` events from matching service
 - **Supabase Auth API**: validates access tokens for socket authentication
+- **Supabase REST**: upserts per-user attempt history rows on session end
 - **TypeScript**: typed contracts and service logic
+
+## Attempt History Persistence
+
+When a collaboration session ends, the service writes two rows to the Supabase `history` table:
+
+- one row for `user1Id`
+- one row for `user2Id`
+
+The row shape should match the actual database model used by the rest of the app:
+
+- `user_id uuid`
+- `question_id bigint`
+- `session_id text`
+- `partner_id uuid`
+- `solution text`
+
+The upsert is intentionally idempotent and depends on the database constraint documented in [docs/history-table.sql](docs/history-table.sql):
+
+- unique `(session_id, user_id)`
+
+Without that constraint, the `on_conflict=session_id,user_id` write path in `src/services/attemptHistory.ts` is not guaranteed to deduplicate repeated session-end writes.
 
 ## Development
 
@@ -129,7 +151,7 @@ npm run build
 
 1. Verify RabbitMQ connectivity and `RABBITMQ_MATCH_FOUND_*` values
 2. Verify collaboration service is subscribed to the expected exchange/routing key
-3. Confirm users are connected and registered on the notification socket
+3. Confirm users are connected on the notification socket
 
 ### Session Join Authentication Errors
 
