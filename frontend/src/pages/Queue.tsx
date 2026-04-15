@@ -192,12 +192,10 @@ const Queue = () => {
 
         {showSessionReadyFailure && (
           <div className="animate-fade-in">
-            <h2 className="text-xl font-semibold text-red-500 mb-4">
-              Unable to open your session
-            </h2>
+            <h2 className="text-xl font-semibold text-red-500 mb-4">Unable to open your session</h2>
             <p className="text-muted-foreground mb-3">
-              Your match was found, but this client did not receive the collaboration session handoff
-              in time.
+              Your match was found, but this client did not receive the collaboration session
+              handoff in time.
             </p>
             {collabError && <p className="text-muted-foreground mb-8">{collabError}</p>}
             <div className="flex gap-3 justify-center">
