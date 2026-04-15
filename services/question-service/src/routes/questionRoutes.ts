@@ -17,8 +17,8 @@ router.get('/:id', getQuestionById);
 router.get('/random/:difficulty/:topic', getRandomQuestionByFilter);
 
 // Admin-only write routes
-router.post('/add', authenticate, addQuestion);
-router.put('/:id/update', authenticate, updateQuestion);
-router.delete('/:id/delete', authenticate, deleteQuestion);
+router.post('/', authenticate, addQuestion);
+router.put('/:id', authenticate, updateQuestion);
+router.delete('/:id', authenticate, deleteQuestion);
 
 export default router;
