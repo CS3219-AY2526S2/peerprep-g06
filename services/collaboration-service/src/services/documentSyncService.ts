@@ -5,6 +5,7 @@ import { Buffer } from 'buffer';
 import * as Y from 'yjs';
 import { getDocumentSnapshot, saveDocumentSnapshot } from './sessionPersistence';
 import { SessionDocumentSnapshot } from '../types/session';
+import { logger } from '../utils/logger';
 
 const DOCUMENT_TEXT_KEY = 'code';
 const SNAPSHOT_PERSIST_DEBOUNCE_MS = 500;
@@ -38,6 +39,31 @@ function buildSnapshot(
     format: 'yjs-update-base64',
     updatedAt,
   };
+}
+
+export function getPlainTextFromDocumentSnapshot(snapshot: SessionDocumentSnapshot | null): string {
+  if (!snapshot) {
+    return '';
+  }
+
+  if (snapshot.format === 'plain-text') {
+    return snapshot.content;
+  }
+
+  const doc = new Y.Doc();
+
+  try {
+    Y.applyUpdate(doc, decodeUpdateBase64(snapshot.content));
+    return doc.getText(DOCUMENT_TEXT_KEY).toString();
+  } catch (error) {
+    logger.error(
+      `Failed to decode persisted document snapshot for session ${snapshot.sessionId}`,
+      error,
+    );
+    return '';
+  } finally {
+    doc.destroy();
+  }
 }
 
 function loadDocumentFromSnapshot(snapshot: SessionDocumentSnapshot | null): {
@@ -178,3 +204,5 @@ export async function disposeDocument(
   activeDocument.doc.destroy();
   activeDocuments.delete(sessionId);
 }
+
+export { flushDocumentSnapshot };

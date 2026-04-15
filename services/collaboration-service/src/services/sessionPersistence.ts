@@ -3,7 +3,7 @@
 import { createHash } from 'crypto';
 import { config } from '../config/env';
 import { redis } from '../config/redis';
-import { Question } from '../types/contracts';
+import { Question } from '../../../../shared/types';
 import {
   CollaborationSession,
   GracePeriodRecord,
@@ -15,6 +15,7 @@ import {
 } from '../types/session';
 
 const MATCH_LOCK_TTL_SECONDS = 30;
+const GRACE_INDEX_KEY = 'collab:grace-periods';
 
 function sessionTtlSeconds(): number {
   // Session data should outlive join-token delivery slightly so reconnect and inspection still work.
@@ -53,10 +54,28 @@ export const collabKeys = {
   pendingDelivery: (userId: string, sessionId: string) =>
     `collab:user:${userId}:delivery:${sessionId}`,
   pendingDeliveryIndex: (userId: string) => `collab:user:${userId}:deliveries`,
+  graceIndex: () => GRACE_INDEX_KEY,
 } as const;
 
 export function hashJoinToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+function encodeGraceIndexMember(sessionId: string, userId: string): string {
+  return JSON.stringify({ sessionId, userId });
+}
+
+function decodeGraceIndexMember(member: string): { sessionId: string; userId: string } | null {
+  try {
+    const parsed = JSON.parse(member) as { sessionId?: unknown; userId?: unknown };
+    if (typeof parsed.sessionId === 'string' && typeof parsed.userId === 'string') {
+      return { sessionId: parsed.sessionId, userId: parsed.userId };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 export async function claimMatchSessionLock(matchId: string): Promise<boolean> {
@@ -165,7 +184,6 @@ export async function updateParticipantPresence(
   userId: string,
   update: Partial<SessionParticipant>,
 ): Promise<SessionParticipant | null> {
-  // Presence updates are done by rewriting the session's participant array for now.
   const participants = await getParticipants(sessionId);
   if (!participants) {
     return null;
@@ -259,9 +277,15 @@ export async function listPendingDeliveries(userId: string): Promise<PendingDeli
 }
 
 export async function saveGracePeriod(record: GracePeriodRecord): Promise<void> {
-  await redis.set(collabKeys.graceTimer(record.sessionId, record.userId), JSON.stringify(record), {
+  const transaction = redis.multi();
+  transaction.set(collabKeys.graceTimer(record.sessionId, record.userId), JSON.stringify(record), {
     EX: graceTtlSeconds(record),
   });
+  transaction.zAdd(collabKeys.graceIndex(), {
+    score: new Date(record.expiresAt).getTime(),
+    value: encodeGraceIndexMember(record.sessionId, record.userId),
+  });
+  await transaction.exec();
 }
 
 export async function getGracePeriod(
@@ -272,23 +296,44 @@ export async function getGracePeriod(
 }
 
 export async function listGracePeriods(): Promise<GracePeriodRecord[]> {
-  const gracePeriods: GracePeriodRecord[] = [];
-
-  for await (const key of redis.scanIterator({
-    MATCH: 'collab:session:*:grace:*',
-    COUNT: 100,
-  })) {
-    const record = parseJson<GracePeriodRecord>(await redis.get(String(key)));
-    if (record) {
-      gracePeriods.push(record);
-    }
+  const members = await redis.zRangeByScore(collabKeys.graceIndex(), '-inf', '+inf');
+  if (members.length === 0) {
+    return [];
   }
 
-  return gracePeriods;
+  const descriptors = members.map((member) => ({
+    member,
+    decoded: decodeGraceIndexMember(member),
+  }));
+  const gracePeriods = await Promise.all(
+    descriptors.map((descriptor) =>
+      descriptor.decoded
+        ? getGracePeriod(descriptor.decoded.sessionId, descriptor.decoded.userId)
+        : Promise.resolve(null),
+    ),
+  );
+  const validGracePeriods: GracePeriodRecord[] = [];
+
+  for (let index = 0; index < descriptors.length; index += 1) {
+    const descriptor = descriptors[index];
+    const gracePeriod = gracePeriods[index];
+
+    if (!descriptor.decoded || !gracePeriod) {
+      await redis.zRem(collabKeys.graceIndex(), descriptor.member);
+      continue;
+    }
+
+    validGracePeriods.push(gracePeriod);
+  }
+
+  return validGracePeriods;
 }
 
 export async function clearGracePeriod(sessionId: string, userId: string): Promise<void> {
-  await redis.del(collabKeys.graceTimer(sessionId, userId));
+  const transaction = redis.multi();
+  transaction.del(collabKeys.graceTimer(sessionId, userId));
+  transaction.zRem(collabKeys.graceIndex(), encodeGraceIndexMember(sessionId, userId));
+  await transaction.exec();
 }
 
 export async function deleteSessionState(sessionId: string): Promise<void> {
@@ -310,6 +355,10 @@ export async function deleteSessionState(sessionId: string): Promise<void> {
   for (const participant of participants ?? []) {
     transaction.del(collabKeys.joinToken(sessionId, participant.userId));
     transaction.del(collabKeys.graceTimer(sessionId, participant.userId));
+    transaction.zRem(
+      collabKeys.graceIndex(),
+      encodeGraceIndexMember(sessionId, participant.userId),
+    );
     transaction.del(collabKeys.pendingDelivery(participant.userId, sessionId));
     transaction.sRem(collabKeys.pendingDeliveryIndex(participant.userId), sessionId);
   }

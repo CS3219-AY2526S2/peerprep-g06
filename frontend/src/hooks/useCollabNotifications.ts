@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 
 export function useCollabNotifications(userId?: string) {
   const socketRef = useRef<NotificationSocket | null>(null);
+  const activeConnectionIdRef = useRef(0);
   const { setPendingSession, setCollabNotificationStatus, setCollabError } = useAppStore();
 
   useEffect(() => {
@@ -15,16 +16,22 @@ export function useCollabNotifications(userId?: string) {
     }
 
     const connect = async () => {
+      const connectionId = activeConnectionIdRef.current + 1;
+      activeConnectionIdRef.current = connectionId;
       setCollabNotificationStatus('connecting');
       setCollabError(null);
 
       try {
         const accessToken = await getCollabAccessToken();
-        if (!isMounted) {
+        if (!isMounted || activeConnectionIdRef.current !== connectionId) {
           return;
         }
 
         const socket = createNotificationSocket(accessToken);
+        if (!isMounted || activeConnectionIdRef.current !== connectionId) {
+          socket.disconnect();
+          return;
+        }
         socketRef.current = socket;
 
         socket.on('connect', () => {
@@ -33,7 +40,6 @@ export function useCollabNotifications(userId?: string) {
           }
 
           setCollabNotificationStatus('connected');
-          socket.emit('notification:register', { userId });
         });
 
         socket.on('session-ready', (payload: SessionReadyPayload) => {
@@ -71,7 +77,7 @@ export function useCollabNotifications(userId?: string) {
           setCollabNotificationStatus('disconnected');
         });
       } catch (error) {
-        if (!isMounted) {
+        if (!isMounted || activeConnectionIdRef.current !== connectionId) {
           return;
         }
 
@@ -86,6 +92,7 @@ export function useCollabNotifications(userId?: string) {
 
     return () => {
       isMounted = false;
+      activeConnectionIdRef.current += 1;
 
       if (socketRef.current) {
         socketRef.current.disconnect();

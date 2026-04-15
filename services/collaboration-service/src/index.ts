@@ -3,24 +3,21 @@
 import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
-import { Server } from 'socket.io';
+import { Namespace, Server } from 'socket.io';
 import dotenv from 'dotenv';
 import { config } from './config/env';
-import { connectRabbitMq, registerRabbitMqConsumer } from './config/rabbitmq';
+import { connectRabbitMq } from './config/rabbitmq';
 import { connectRedis } from './config/redis';
 import { startMatchFoundConsumer } from './services/matchFoundConsumer';
 import { configureNotificationNamespace } from './services/notificationSocket';
-import {
-  createSocketIoNotificationTransport,
-  createSocketIoSessionTransport,
-} from './services/realtimeTransport';
 import { configureSessionNamespace, recoverScheduledGracePeriods } from './services/sessionSocket';
 import {
   CollaborationSocketClientToServerEvents,
+  CollaborationSocketServerToClientEvents,
   CollaborationSessionSocketClientToServerEvents,
   CollaborationSessionSocketServerToClientEvents,
-  CollaborationSocketServerToClientEvents,
-} from './types/contracts';
+} from '../../../shared/types';
+import { SessionSocketData } from './services/socketAuth';
 import { logger } from './utils/logger';
 
 dotenv.config();
@@ -46,14 +43,14 @@ app.use(
 );
 app.use(express.json());
 
-const notificationTransport = createSocketIoNotificationTransport(io);
-configureNotificationNamespace(io, notificationTransport);
-const sessionNamespace = io.of('/session') as unknown as import('socket.io').Namespace<
+configureNotificationNamespace(io);
+const sessionNamespace = io.of('/session') as unknown as Namespace<
   CollaborationSessionSocketClientToServerEvents,
-  CollaborationSessionSocketServerToClientEvents
+  CollaborationSessionSocketServerToClientEvents,
+  Record<string, never>,
+  SessionSocketData
 >;
-const sessionTransport = createSocketIoSessionTransport(sessionNamespace);
-configureSessionNamespace(sessionNamespace, sessionTransport);
+configureSessionNamespace(sessionNamespace);
 
 app.get('/health', (_req, res) => {
   res.status(200).json({
@@ -66,11 +63,8 @@ app.get('/health', (_req, res) => {
 async function bootstrap() {
   // Infrastructure dependencies are required before the service can consume match events safely.
   await connectRedis();
-  await recoverScheduledGracePeriods(sessionTransport);
-  await registerRabbitMqConsumer((consumerChannel) =>
-    startMatchFoundConsumer(consumerChannel, notificationTransport),
-  );
-  await connectRabbitMq();
+  await recoverScheduledGracePeriods(sessionNamespace);
+  await connectRabbitMq((consumerChannel) => startMatchFoundConsumer(consumerChannel, io));
 
   server.listen(config.port, () => {
     logger.info(`Collaboration service listening on port ${config.port}`);

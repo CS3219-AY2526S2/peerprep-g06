@@ -1,38 +1,14 @@
 // Socket.IO notification namespace for pre-session events such as "session-ready".
-import { Server } from 'socket.io';
-import {
-  CollaborationSocketClientToServerEvents,
-  CollaborationSocketServerToClientEvents,
-} from '../types/contracts';
 import { getSupabaseUser } from '../lib/supabase';
-import { deliverPendingNotifications } from './notificationService';
-import { NotificationTransport } from './realtimeTransport';
+import {
+  deliverPendingNotifications,
+  NotificationServer,
+  registerAuthenticatedNotificationSocket,
+} from './notificationService';
+import { AuthenticatedNotificationSocket, getBearerToken } from './socketAuth';
 import { logger } from '../utils/logger';
 
-type NotificationServer = Server<
-  CollaborationSocketClientToServerEvents,
-  CollaborationSocketServerToClientEvents
->;
-
-function getBearerToken(socket: any): string | null {
-  // Frontends can provide the access token either via socket auth payload or Authorization header.
-  const authToken = socket.handshake.auth?.token;
-  if (typeof authToken === 'string' && authToken.length > 0) {
-    return authToken;
-  }
-
-  const authorization = socket.handshake.headers.authorization;
-  if (typeof authorization === 'string' && authorization.startsWith('Bearer ')) {
-    return authorization.slice('Bearer '.length);
-  }
-
-  return null;
-}
-
-export function configureNotificationNamespace(
-  io: NotificationServer,
-  transport: NotificationTransport,
-): void {
+export function configureNotificationNamespace(io: NotificationServer): void {
   // Every client-facing notification socket is authenticated before it can register for user-targeted events.
   io.use(async (socket, next) => {
     try {
@@ -54,19 +30,18 @@ export function configureNotificationNamespace(
     }
   });
 
-  io.on('connection', (socket: any) => {
-    const authenticatedUserId = socket.data.userId as string;
+  io.on('connection', (socket: AuthenticatedNotificationSocket) => {
+    const authenticatedUserId = socket.data.userId;
+    if (!authenticatedUserId) {
+      socket.disconnect(true);
+      return;
+    }
     logger.info(`Notification socket connected: ${socket.id} for user ${authenticatedUserId}`);
+    registerAuthenticatedNotificationSocket(socket, authenticatedUserId);
+    void deliverPendingNotifications(io, authenticatedUserId);
 
-    socket.on('notification:register', async (payload: { userId: string }) => {
-      // The socket is already authenticated, so registration is just binding that socket to the user's room.
-      if (!payload?.userId || payload.userId !== authenticatedUserId) {
-        socket.emit('notification:error', { message: 'User registration mismatch' });
-        return;
-      }
-
-      transport.registerUserSocket(socket, authenticatedUserId);
-      await deliverPendingNotifications(transport, authenticatedUserId);
+    socket.on('notification:register', async () => {
+      await deliverPendingNotifications(io, authenticatedUserId);
     });
 
     socket.on('disconnect', (reason: string) => {

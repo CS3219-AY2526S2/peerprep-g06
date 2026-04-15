@@ -1,14 +1,15 @@
 // RabbitMQ consumer for match handoff events.
 // It creates the session, queues session-ready notifications, and delivers them immediately if possible.
 import { config } from '../config/env';
-import { MatchFoundEvent } from '../types/contracts';
+import type { Channel, ConsumeMessage } from 'amqplib';
+import { MatchFoundEvent } from '../../../../shared/types';
 import { createSessionFromMatchFound } from './sessionStore';
 import {
   createSessionReadyPayload,
   deliverSessionReadyIfConnected,
+  NotificationServer,
   queueSessionReadyNotification,
 } from './notificationService';
-import { NotificationTransport } from './realtimeTransport';
 import { logger } from '../utils/logger';
 
 interface MatchFoundEnvelope {
@@ -41,8 +42,8 @@ export function parseMatchFoundEvent(content: Buffer): MatchFoundEvent {
 }
 
 export async function startMatchFoundConsumer(
-  channel: any,
-  notificationTransport: NotificationTransport,
+  channel: Channel,
+  notificationServer: NotificationServer,
 ): Promise<void> {
   await channel.assertExchange(config.rabbitmq.matchFoundExchange, 'topic', {
     durable: true,
@@ -57,7 +58,7 @@ export async function startMatchFoundConsumer(
   );
   await channel.prefetch(1);
 
-  await channel.consume(config.rabbitmq.matchFoundQueue, async (message: any) => {
+  await channel.consume(config.rabbitmq.matchFoundQueue, async (message: ConsumeMessage | null) => {
     if (!message) {
       return;
     }
@@ -87,7 +88,7 @@ export async function startMatchFoundConsumer(
       // If the user is already online on the notification socket, deliver immediately and clear the pending record.
       for (const payload of sessionReadyPayloads) {
         await deliverSessionReadyIfConnected(
-          notificationTransport,
+          notificationServer,
           payload!.userId,
           payload!.sessionId,
         );
