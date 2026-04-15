@@ -68,6 +68,12 @@ export async function findMatch(user: User): Promise<Match | undefined> {
         `Match ${match.id} created: ${user.id} <-> ${candidate.id} | topic: ${commonTopic}`,
       );
       return match;
+    } catch (error) {
+      logger.error(
+        `Failed to create match between ${user.id} and ${candidate.id} (topic: ${commonTopic}):`,
+        error,
+      );
+      continue;
     } finally {
       // always release both locks, whether match succeeded or an error occurred
       await releaseUserMatch(user.id);
