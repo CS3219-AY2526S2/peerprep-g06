@@ -382,10 +382,10 @@ const Questions = () => {
                 </div>
 
                 <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Topic</label>
+                  <label className="text-sm text-muted-foreground mb-1 block">Topics</label>
                   <select
                     value={form.topic}
-                    multiple={false} // #Todo: allow multiple topics (with better ui)
+                    multiple={true} // #Todo: allow multiple topics (with better ui)
                     onChange={(e) =>
                       setForm({
                         ...form,
@@ -394,7 +394,7 @@ const Questions = () => {
                     }
                     className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:border-primary transition-colors"
                   >
-                    <option value="">Select a topic</option>
+                    <option value="">None</option>
                     <option value="arrays_and_hashing">Arrays And Hashing</option>
                     <option value="two_pointers">Two Pointers</option>
                     <option value="stack">Stack</option>

@@ -103,7 +103,7 @@ interface AppStore {
   currentState: AppState;
   user: User | null;
   selectedDifficulty: Difficulty | null;
-  selectedTopic: string | null;
+  selectedTopics: string[];
   selectedLanguage: string | null;
   matchedPeer: User | null;
   sessionCode: string;
@@ -116,7 +116,7 @@ interface AppStore {
   setUser: (user: User | null) => void;
   logout: () => void;
   setDifficulty: (difficulty: Difficulty) => void;
-  setTopic: (topic: string) => void;
+  setTopic: (topic: string[]) => void;
   setLanguage: (language: string) => void;
   setMatchedPeer: (peer: User | null) => void;
   setSessionCode: (code: string) => void;
@@ -132,7 +132,7 @@ export const useAppStore = create<AppStore>((set) => ({
   currentState: 'landing',
   user: null,
   selectedDifficulty: null,
-  selectedTopic: null,
+  selectedTopics: [],
   selectedLanguage: null,
   matchedPeer: null,
   sessionCode: `function solution(input) {\n  // Write your solution here\n  \n  return result;\n}`,
@@ -156,7 +156,7 @@ export const useAppStore = create<AppStore>((set) => ({
         user: null,
         currentState: 'landing',
         selectedDifficulty: null,
-        selectedTopic: null,
+        selectedTopics: [],
         selectedLanguage: null,
         matchedPeer: null,
         pendingSession: null,
@@ -167,7 +167,7 @@ export const useAppStore = create<AppStore>((set) => ({
     })(),
 
   setDifficulty: (difficulty) => set({ selectedDifficulty: difficulty }),
-  setTopic: (topic) => set({ selectedTopic: topic }),
+  setTopic: (topic) => set({ selectedTopics: topic }),
   setLanguage: (language) => set({ selectedLanguage: language }),
   setMatchedPeer: (peer) => set({ matchedPeer: peer }),
   setSessionCode: (code) => set({ sessionCode: code }),
@@ -188,7 +188,7 @@ export const useAppStore = create<AppStore>((set) => ({
       persistPendingSession(null);
       set({
         selectedDifficulty: null,
-        selectedTopic: null,
+        selectedTopics: [],
         matchedPeer: null,
         currentState: 'matching',
         pendingSession: null,

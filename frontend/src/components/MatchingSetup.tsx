@@ -15,7 +15,7 @@ export const MatchingSetup = () => {
     user,
     logout,
     selectedDifficulty,
-    selectedTopic,
+    selectedTopics,
     selectedLanguage,
     setDifficulty,
     setTopic,
@@ -25,7 +25,7 @@ export const MatchingSetup = () => {
   } = useAppStore();
   const { signOut } = useAuth();
   const [localDifficulty, setLocalDifficulty] = useState<Difficulty | null>(selectedDifficulty);
-  const [localTopic, setLocalTopic] = useState<string | null>(selectedTopic);
+  const [localTopics, setLocalTopics] = useState<string[]>(selectedTopics);
   const [localLanguage, setLocalLanguage] = useState<string | null>(selectedLanguage);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -36,17 +36,17 @@ export const MatchingSetup = () => {
   };
 
   const handleStartMatching = () => {
-    if (localDifficulty && localTopic && localLanguage) {
+    if (localDifficulty && localTopics.length > 0 && localLanguage) {
       clearPendingSession();
       setDifficulty(localDifficulty);
-      setTopic(localTopic);
+      setTopic(localTopics);
       setLanguage(localLanguage);
       setCurrentState('queue');
       navigate('/queue');
     }
   };
 
-  const canProceed = localDifficulty && localTopic && localLanguage;
+  const canProceed = localDifficulty && localTopics.length > 0 && localLanguage;
 
   return (
     <div className="min-h-screen bg-background">
@@ -146,17 +146,27 @@ export const MatchingSetup = () => {
             {topics.map((topic) => (
               <button
                 key={topic.id}
-                onClick={() => setLocalTopic(topic.id)}
+                onClick={() => {
+                  setLocalTopics((prev) => {
+                    if (prev.includes(topic.id)) {
+                      return prev.filter((id) => id !== topic.id);
+                    } else {
+                      return [...prev, topic.id];
+                    }
+                  });
+                }}
                 className={cn(
                   'p-4 rounded-xl border transition-all duration-200 text-left',
-                  localTopic === topic.id
+                  localTopics.includes(topic.id)
                     ? 'border-primary bg-primary/10 shadow-glow'
                     : 'border-border bg-card hover:border-primary/50',
                 )}
               >
                 <div className="text-2xl mb-2">{topic.icon}</div>
                 <span className="text-sm font-medium">{topic.label}</span>
-                {localTopic === topic.id && <CheckCircle2 className="h-4 w-4 text-primary mt-2" />}
+                {localTopics.includes(topic.id) && (
+                  <CheckCircle2 className="h-4 w-4 text-primary mt-2" />
+                )}
               </button>
             ))}
           </div>

@@ -16,12 +16,11 @@ const Queue = () => {
   const { user } = useAuth();
   const {
     selectedDifficulty,
-    selectedTopic,
+    selectedTopics,
     selectedLanguage,
     pendingSession,
     setCurrentState,
     clearPendingSession,
-    resetMatching,
   } = useAppStore();
 
   const { joinQueue, cancelQueue, status, matchData, error, timeLeft } = useMatchmaking();
@@ -32,7 +31,7 @@ const Queue = () => {
 
   // Join queue on mount
   useEffect(() => {
-    if (!user || !selectedDifficulty || !selectedTopic || !selectedLanguage) {
+    if (!user || !selectedDifficulty || selectedTopics.length === 0 || !selectedLanguage) {
       navigate('/match');
       return;
     }
@@ -41,7 +40,7 @@ const Queue = () => {
     joinQueue({
       userId: user.id,
       difficulty: selectedDifficulty,
-      topics: [selectedTopic],
+      topics: selectedTopics,
       language: selectedLanguage,
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -79,8 +78,17 @@ const Queue = () => {
   };
 
   const handleRetry = () => {
-    resetMatching();
-    navigate('/match');
+    if (!user || !selectedDifficulty || selectedTopics.length === 0 || !selectedLanguage) {
+      navigate('/match');
+      return;
+    }
+    setPhase('queue');
+    joinQueue({
+      userId: user.id,
+      difficulty: selectedDifficulty,
+      topics: selectedTopics,
+      language: selectedLanguage,
+    });
   };
 
   const handleChangePreferences = () => {
@@ -104,7 +112,7 @@ const Queue = () => {
             <QueueRing state={ringState} timeLeft={timeLeft} />
             <h2 className="text-xl font-semibold mt-6 mb-2">Searching for a match...</h2>
             <p className="text-muted-foreground mb-8">
-              {selectedDifficulty} / {selectedTopic} / {selectedLanguage}
+              {selectedDifficulty} / {selectedTopics.join(', ')} / {selectedLanguage}
             </p>
             <Button variant="ghost" onClick={handleCancel}>
               Cancel
@@ -138,10 +146,10 @@ const Queue = () => {
               Try changing your preferences or retry with the same settings.
             </p>
             <div className="flex gap-3 justify-center">
-              <Button variant="hero" onClick={handleChangePreferences}>
-                Change Preferences
+              <Button variant="ghost" onClick={handleChangePreferences}>
+                Cancel
               </Button>
-              <Button variant="ghost" onClick={handleRetry}>
+              <Button variant="hero" onClick={handleRetry}>
                 Retry
               </Button>
             </div>
